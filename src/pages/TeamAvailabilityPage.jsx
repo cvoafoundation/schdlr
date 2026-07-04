@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../hooks/useAuth";
 import { Panel, Field, LoadingBlock, ErrorBlock } from "../components/ui.jsx";
-import { addDays, isWeekend, toDateInput, toDateOnly, isMemberBlockedOnDate, buildAvailabilityIndex } from "../lib/scheduling.js";
-
+import { addDays, isWeekend, toDateInput, toDateOnly, isMemberBlockedOnDate, buildAvailabilityIndex, fmtTime } from "../lib/scheduling.js";
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DOW = ["S", "M", "T", "W", "T", "F", "S"];
@@ -227,7 +226,7 @@ export default function TeamAvailabilityPage() {
                 {myPartials.length === 0 && <div className="cv-faint text-sm italic">No daily breaks set.</div>}
                 {myPartials.map((p) => (
                   <div key={p.id} className="cv-row flex items-center justify-between px-3 py-2">
-                    <div><div className="text-sm font-semibold">{p.label}</div><div className="font-mono text-xs cv-graphite">{p.start_minutes}–{p.end_minutes} min · {p.recurring ? "Every day" : p.block_date}</div></div>
+                    <div><div className="text-sm font-semibold">{p.label}</div><div className="font-mono text-xs cv-graphite">{fmtTime(p.start_minutes)}–{fmtTime(p.end_minutes)} · {p.recurring ? "Every day" : p.block_date}</div></div>
                     <button onClick={() => removePartialBlock(p.id)} className="cv-x-btn">✕</button>
                   </div>
                 ))}
