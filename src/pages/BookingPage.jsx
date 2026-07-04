@@ -36,6 +36,8 @@ export default function BookingPage() {
   const [waitlistForm, setWaitlistForm] = useState({ name: "", email: "" });
   const [submitting, setSubmitting] = useState(false);
   const [confirmedBooking, setConfirmedBooking] = useState(null);
+  const [honeypot, setHoneypot] = useState("");
+  const [formOpenedAt] = useState(() => Date.now());
 
   async function loadStatic() {
     setLoading(true); setError("");
@@ -153,6 +155,11 @@ export default function BookingPage() {
   }
 
   async function confirmBooking() {
+    if (honeypot) return; // a bot filled the invisible field — silently drop it
+    if (Date.now() - formOpenedAt < 2500) {
+      setError("That went a little fast — please double check your details and try again.");
+      return;
+    }
     setSubmitting(true); setError("");
     try {
       if (eventType.is_group) {
@@ -351,6 +358,13 @@ export default function BookingPage() {
               <Field label="Email"><input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="cv-input w-full py-2" /></Field>
               {!eventType?.is_group && <Field label="Phone (optional)"><input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="cv-input w-full py-2" /></Field>}
               <Field label="Notes"><textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} className="cv-input w-full py-2 resize-none" /></Field>
+              {/* Honeypot: invisible to real people, bots tend to fill every field they find */}
+              <input
+                type="text" tabIndex={-1} autoComplete="off" value={honeypot}
+                onChange={(e) => setHoneypot(e.target.value)}
+                style={{ position: "absolute", left: "-9999px", width: 1, height: 1, opacity: 0 }}
+                aria-hidden="true"
+              />
             </div>
 
             {!eventType?.is_group && member.id !== "any" && !urgent && (
