@@ -43,8 +43,12 @@ export default function Layout({ children }) {
                 <span className="cv-divider w-px self-stretch mx-1" />
                 <NavLink to="/dashboard" className={tabClass}>Home</NavLink>
                 <NavLink to="/team" className={tabClass}>Team availability</NavLink>
-                <NavLink to="/analytics" className={tabClass}>Analytics</NavLink>
-                <NavLink to="/settings" className={tabClass}>Settings</NavLink>
+                {profile?.is_admin && (
+                  <>
+                    <NavLink to="/analytics" className={tabClass}>Analytics</NavLink>
+                    <NavLink to="/settings" className={tabClass}>Settings</NavLink>
+                  </>
+                )}
               </>
             )}
           </div>

@@ -149,6 +149,7 @@ export default function BookingPage() {
     await supabase.from("waitlist").insert({
       event_type_id: eventType.id, member_id: member.id === "any" ? null : member.id,
       waitlist_date: toDateInput(selectedDate), guest_name: waitlistForm.name, guest_email: waitlistForm.email,
+      organization_id: orgId,
     });
     setWaitlistForm({ name: "", email: "" });
     alert("You're on the list — we'll reach out if a spot opens.");
@@ -168,12 +169,12 @@ export default function BookingPage() {
           const { data, error } = await supabase.from("bookings").insert({
             event_type_id: "group", member_id: null, booking_date: toDateInput(selectedDate),
             start_minutes: eventType.fixed_minutes, duration_minutes: eventType.duration_minutes,
-            guest_name: "Group session", guest_email: "group@cvoa.org", status: "upcoming",
+            guest_name: "Group session", guest_email: "group@cvoa.org", status: "upcoming", organization_id: orgId,
           }).select().single();
           if (error) throw error;
           bookingId = data.id;
         }
-        const { error: gaError } = await supabase.from("group_attendees").insert({ booking_id: bookingId, name: form.name, email: form.email });
+        const { error: gaError } = await supabase.from("group_attendees").insert({ booking_id: bookingId, name: form.name, email: form.email, organization_id: orgId });
         if (gaError) throw gaError;
         setConfirmedBooking({ id: bookingId, date: selectedDate, minutes: eventType.fixed_minutes, duration: eventType.duration_minutes });
         setStep("confirmed");
@@ -192,6 +193,7 @@ export default function BookingPage() {
             event_type_id: eventType.id, member_id: assignee.id, booking_date: toDateInput(d), start_minutes: selectedSlot.minutes,
             duration_minutes: eventType.duration_minutes, guest_name: form.name, guest_email: form.email, guest_phone: form.phone,
             notes: form.notes, status: "upcoming", urgent, series_id: seriesId, series_index: i + 1, series_total: seriesRepeat.count,
+            organization_id: orgId,
           });
           const cad = CADENCES.find((c) => c.id === seriesRepeat.cadence);
           d = cad.id === "monthly" ? new Date(d.getFullYear(), d.getMonth() + 1, d.getDate()) : addDays(d, cad.days);
@@ -206,7 +208,7 @@ export default function BookingPage() {
       const { data, error } = await supabase.from("bookings").insert({
         event_type_id: eventType.id, member_id: assignee.id, booking_date: toDateInput(selectedDate), start_minutes: selectedSlot.minutes,
         duration_minutes: eventType.duration_minutes, guest_name: form.name, guest_email: form.email, guest_phone: form.phone,
-        notes: form.notes, status: "upcoming", urgent,
+        notes: form.notes, status: "upcoming", urgent, organization_id: orgId,
       }).select().single();
       if (error) throw error;
       setConfirmedBooking({ id: data.id, date: selectedDate, minutes: selectedSlot.minutes, duration: eventType.duration_minutes });
@@ -228,6 +230,7 @@ export default function BookingPage() {
   if (loading || !index) return <LoadingBlock label="Loading booking page…" />;
 
   const hostLabel = member.id === "any" ? "next available team member" : `${member.name} — ${member.role}`;
+  const orgId = settings?.organization_id ?? null;
 
   return (
     <div>

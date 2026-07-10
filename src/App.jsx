@@ -19,6 +19,14 @@ function RequireAuth({ children }) {
   return children;
 }
 
+function RequireAdmin({ children }) {
+  const { user, profile, loading } = useAuth();
+  if (loading) return <Layout><LoadingBlock label="Checking your session…" /></Layout>;
+  if (!user) return <Navigate to="/login" replace />;
+  if (!profile?.is_admin) return <Navigate to="/dashboard" replace />;
+  return children;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -28,8 +36,8 @@ export default function App() {
       <Route path="/reset-password" element={<Layout><ResetPasswordPage /></Layout>} />
       <Route path="/team" element={<RequireAuth><Layout><TeamAvailabilityPage /></Layout></RequireAuth>} />
       <Route path="/dashboard" element={<RequireAuth><Layout><DashboardPage /></Layout></RequireAuth>} />
-      <Route path="/analytics" element={<RequireAuth><Layout><AnalyticsPage /></Layout></RequireAuth>} />
-      <Route path="/settings" element={<RequireAuth><Layout><SettingsPage /></Layout></RequireAuth>} />
+      <Route path="/analytics" element={<RequireAdmin><Layout><AnalyticsPage /></Layout></RequireAdmin>} />
+      <Route path="/settings" element={<RequireAdmin><Layout><SettingsPage /></Layout></RequireAdmin>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

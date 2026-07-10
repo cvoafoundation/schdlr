@@ -333,11 +333,16 @@ create policy "waitlist_staff_update" on waitlist for update using (auth.role() 
 drop policy if exists "org_settings_select_all" on org_settings;
 create policy "org_settings_select_all" on org_settings for select using (true);
 drop policy if exists "org_settings_staff_write" on org_settings;
-create policy "org_settings_staff_write" on org_settings for update using (auth.role() = 'authenticated');
+create policy "org_settings_admin_write" on org_settings for update using (
+  exists (select 1 from team_members tm where tm.id = auth.uid() and tm.is_admin = true)
+);
 
 -- audit_log: staff only, both read and write.
 drop policy if exists "audit_log_staff_all" on audit_log;
-create policy "audit_log_staff_all" on audit_log for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "audit_log_admin_select" on audit_log for select using (
+  exists (select 1 from team_members tm where tm.id = auth.uid() and tm.is_admin = true)
+);
+create policy "audit_log_staff_insert" on audit_log for insert with check (auth.role() = 'authenticated');
 
 -- ============================================================================
 -- FUNCTIONS for the public "manage my booking" self-service flow.
