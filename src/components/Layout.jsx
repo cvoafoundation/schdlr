@@ -13,7 +13,7 @@ export default function Layout({ children }) {
       <div className="max-w-5xl mx-auto px-5 sm:px-8 py-10">
         <div className="cv-header flex items-start justify-between pb-5 mb-8 flex-wrap gap-4">
           <div>
-            <div className="cv-graphite font-mono text-[11px] tracking-[0.3em] mb-2">SCHEDLR</div>
+            <div className="cv-graphite font-mono text-[11px] tracking-[0.3em] mb-2">your simple schedule solution</div>
             <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight">SCHEDLR</h1>
           </div>
         </div>
@@ -50,7 +50,7 @@ export default function Layout({ children }) {
         {children}
 
         <div className="mt-16 pt-5 cv-graphite font-mono text-[10px] tracking-widest flex items-center gap-2" style={{ borderTop: "1px solid var(--line)" }}>
-          CVOA FOUNDATION · SCHEDULING
+          SCHEDLR
         </div>
       </div>
     </div>
