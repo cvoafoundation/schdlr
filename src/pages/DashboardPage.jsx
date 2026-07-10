@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { Panel, LoadingBlock, ErrorBlock } from "../components/ui.jsx";
+import { Panel, LoadingBlock, ErrorBlock, Avatar } from "../components/ui.jsx";
 import { fmtTime, toDateOnly, downloadIcs } from "../lib/scheduling.js";
 
 function fmtDateShort(d) { return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }); }
@@ -92,7 +92,7 @@ export default function DashboardPage() {
                 <div className="font-mono text-xs cv-faint w-20 shrink-0">{fmtDateShort(toDateOnly(b.booking_date))}</div>
                 <div className="font-mono text-sm w-16 shrink-0">{fmtTime(b.start_minutes)}</div>
                 <div className="flex items-center gap-2 w-36 shrink-0">
-                  <span className="cv-pill-badge font-mono text-[10px] w-6 h-6 flex items-center justify-center border">{m?.initials || "?"}</span>
+                  <Avatar member={m} size={24} />
                   <span className="text-sm font-semibold">{m?.name || "Unassigned"}</span>
                 </div>
                 <div className="flex-1 min-w-[140px]">

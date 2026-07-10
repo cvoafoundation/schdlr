@@ -62,6 +62,25 @@ export function LoadingBlock({ label = "Loading…" }) {
   return <div className="cv-faint font-mono text-sm py-16 text-center">{label}</div>;
 }
 
+export function Avatar({ member, size = 24, className = "" }) {
+  const style = { width: size, height: size, fontSize: Math.max(9, size * 0.4) };
+  if (member?.avatar_url) {
+    return (
+      <img
+        src={member.avatar_url}
+        alt={member.name || ""}
+        style={style}
+        className={`cv-pill-badge rounded-full object-cover border shrink-0 ${className}`}
+      />
+    );
+  }
+  return (
+    <span style={style} className={`cv-pill-badge font-mono flex items-center justify-center border shrink-0 ${className}`}>
+      {member?.initials || "?"}
+    </span>
+  );
+}
+
 export function ErrorBlock({ message }) {
   return (
     <div className="cv-note font-mono text-sm px-4 py-3" style={{ borderColor: "var(--stamp)", color: "var(--stamp)" }}>

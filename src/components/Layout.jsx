@@ -1,9 +1,22 @@
+import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { supabase } from "../lib/supabaseClient";
+import { Avatar } from "./ui.jsx";
 
 export default function Layout({ children }) {
   const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
+  const [org, setOrg] = useState({ org_name: "Schedlr", logo_url: null });
+
+  useEffect(() => {
+    supabase.from("org_settings").select("org_name, logo_url").eq("id", 1).single().then(({ data }) => {
+      if (data) {
+        setOrg(data);
+        document.title = data.org_name || "Schedlr";
+      }
+    });
+  }, []);
 
   const tabClass = ({ isActive }) =>
     `cv-tab font-mono text-xs tracking-widest uppercase px-4 py-2 ${isActive ? "cv-tab-active" : ""}`;
@@ -12,9 +25,12 @@ export default function Layout({ children }) {
     <div className="cv-root min-h-screen w-full">
       <div className="max-w-5xl mx-auto px-5 sm:px-8 py-10">
         <div className="cv-header flex items-start justify-between pb-5 mb-8 flex-wrap gap-4">
-          <div>
-            <div className="cv-graphite font-mono text-[11px] tracking-[0.3em] mb-2"></div>
-            <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight">SCHEDLR</h1>
+          <div className="flex items-center gap-3">
+            {org.logo_url && <img src={org.logo_url} alt="" className="w-9 h-9 object-contain" />}
+            <div>
+              <div className="cv-graphite font-mono text-[11px] tracking-[0.3em] mb-2">{(org.org_name || "SCHEDLR").toUpperCase()}</div>
+              <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight">{org.org_name || "Schedlr"}</h1>
+            </div>
           </div>
         </div>
 
@@ -27,6 +43,7 @@ export default function Layout({ children }) {
                 <span className="cv-divider w-px self-stretch mx-1" />
                 <NavLink to="/team" className={tabClass}>Team availability</NavLink>
                 <NavLink to="/dashboard" className={tabClass}>Dashboard</NavLink>
+                <NavLink to="/analytics" className={tabClass}>Analytics</NavLink>
                 <NavLink to="/settings" className={tabClass}>Settings</NavLink>
               </>
             )}
@@ -35,8 +52,9 @@ export default function Layout({ children }) {
             {user ? (
               <button
                 onClick={async () => { await signOut(); navigate("/"); }}
-                className="cv-btn-outline px-4 py-2 font-mono text-xs tracking-widest uppercase"
+                className="cv-btn-outline px-4 py-2 font-mono text-xs tracking-widest uppercase flex items-center gap-2"
               >
+                {profile && <Avatar member={profile} size={18} />}
                 Sign out {profile ? `(${profile.initials})` : ""}
               </button>
             ) : (
@@ -50,7 +68,7 @@ export default function Layout({ children }) {
         {children}
 
         <div className="mt-16 pt-5 cv-graphite font-mono text-[10px] tracking-widest flex items-center gap-2" style={{ borderTop: "1px solid var(--line)" }}>
-          SCHEDLR
+          {(org.org_name || "SCHEDLR").toUpperCase()}
         </div>
       </div>
     </div>

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../hooks/useAuth";
-import { Panel, Field, LoadingBlock, ErrorBlock } from "../components/ui.jsx";
+import { Panel, Field, LoadingBlock, ErrorBlock, Avatar } from "../components/ui.jsx";
 import { addDays, isWeekend, toDateInput, toDateOnly, isMemberBlockedOnDate, buildAvailabilityIndex, fmtTime } from "../lib/scheduling.js";
+
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DOW = ["S", "M", "T", "W", "T", "F", "S"];
@@ -24,6 +25,8 @@ export default function TeamAvailabilityPage() {
   const [vacStart, setVacStart] = useState(""); const [vacEnd, setVacEnd] = useState(""); const [vacLabel, setVacLabel] = useState("");
   const [partRecurring, setPartRecurring] = useState(true); const [partDate, setPartDate] = useState("");
   const [partStart, setPartStart] = useState("12:00"); const [partEnd, setPartEnd] = useState("13:00"); const [partLabel, setPartLabel] = useState("Lunch");
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState("");
 
   async function loadAll() {
     setLoading(true); setError("");
@@ -68,6 +71,26 @@ export default function TeamAvailabilityPage() {
     return cells;
   }, [viewMonth]);
   const next14 = useMemo(() => Array.from({ length: 14 }, (_, i) => addDays(today, i)), []);
+
+  async function uploadAvatar(e) {
+    const file = e.target.files?.[0];
+    if (!file || !profile) return;
+    setUploadingPhoto(true); setPhotoError("");
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `${profile.id}-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, { cacheControl: "3600", upsert: false });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
+      const { error: updErr } = await supabase.from("team_members").update({ avatar_url: pub.publicUrl }).eq("id", profile.id);
+      if (updErr) throw updErr;
+      await loadAll();
+    } catch (err) {
+      setPhotoError(err.message || "Couldn't upload that photo.");
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
 
   async function toggleBlock(date) {
     if (!isSelf) return;
@@ -133,7 +156,7 @@ export default function TeamAvailabilityPage() {
       <div className="flex flex-wrap gap-2 mb-8">
         {members.map((m) => (
           <button key={m.id} onClick={() => setViewingAs(m.id)} className={`cv-pill flex items-center gap-2 px-3 py-2 ${viewingAs === m.id ? "cv-pill-active" : ""}`}>
-            <span className="cv-pill-badge font-mono text-[10px] w-6 h-6 flex items-center justify-center border">{m.initials}</span>
+            <Avatar member={m} size={24} />
             <span className="text-sm font-semibold">{m.name}</span>
           </button>
         ))}
@@ -142,6 +165,19 @@ export default function TeamAvailabilityPage() {
         <div className="cv-note font-mono text-[11px] mb-6 px-4 py-3">
           Read-only — you can see {viewingMember.name}'s availability, but only they can change it. That's enforced by
           the database (Row Level Security), not just hidden buttons.
+        </div>
+      )}
+
+      {isSelf && (
+        <div className="flex items-center gap-4 mb-6">
+          <Avatar member={viewingMember} size={56} />
+          <div>
+            <label className="cv-btn-outline px-4 py-2 font-mono text-xs tracking-widest uppercase cursor-pointer inline-block">
+              {uploadingPhoto ? "Uploading…" : "Change photo"}
+              <input type="file" accept="image/*" className="hidden" disabled={uploadingPhoto} onChange={uploadAvatar} />
+            </label>
+            {photoError && <div className="text-xs mt-1" style={{ color: "var(--stamp)" }}>{photoError}</div>}
+          </div>
         </div>
       )}
 
@@ -251,7 +287,7 @@ export default function TeamAvailabilityPage() {
             {members.map((m) => (
               <div key={m.id} className="grid" style={{ gridTemplateColumns: `140px repeat(14, 1fr)` }}>
                 <div className="cv-row-head p-2 font-semibold text-sm flex items-center gap-2">
-                  <span className="cv-pill-badge font-mono text-[9px] w-5 h-5 flex items-center justify-center border">{m.initials}</span>{m.name}
+                  <Avatar member={m} size={20} />{m.name}
                 </div>
                 {next14.map((d, i) => {
                   const blocked = isMemberBlockedOnDate(m.id, d, index);

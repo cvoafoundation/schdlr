@@ -15,10 +15,40 @@ create table if not exists team_members (
   name text not null default 'New Team Member',
   role text not null default '',
   initials text not null default '??',
+  avatar_url text,
   slug text unique,
   is_admin boolean not null default false,
   created_at timestamptz not null default now()
 );
+alter table team_members add column if not exists avatar_url text;
+
+-- Computes initials as first letter of first name + last letter of last name,
+-- ignoring punctuation and common suffixes (Jr, Sr, II, III, J.D., M.D., etc).
+create or replace function compute_initials(full_name text)
+returns text
+language plpgsql
+immutable
+as $$
+declare
+  cleaned text;
+  words text[];
+  suffixes text[] := array['jr','sr','ii','iii','iv','v','md','jd','phd','esq'];
+  filtered text[] := array[]::text[];
+  w text;
+begin
+  cleaned := regexp_replace(coalesce(full_name, ''), '[.,]', '', 'g');
+  words := regexp_split_to_array(trim(cleaned), '\s+');
+  foreach w in array words loop
+    if length(w) > 0 and lower(w) <> all(suffixes) then
+      filtered := array_append(filtered, w);
+    end if;
+  end loop;
+  if array_length(filtered, 1) is null or array_length(filtered, 1) = 0 then
+    return upper(left(coalesce(full_name, '??'), 2));
+  end if;
+  return upper(left(filtered[1], 1) || left(filtered[array_length(filtered, 1)], 1));
+end;
+$$;
 
 -- Auto-create a team_members row whenever someone signs up via Supabase Auth.
 create or replace function handle_new_user()
@@ -28,7 +58,7 @@ begin
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
-    upper(left(coalesce(new.raw_user_meta_data->>'name', new.email), 2)),
+    compute_initials(coalesce(new.raw_user_meta_data->>'name', new.email)),
     lower(regexp_replace(coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)), '[^a-zA-Z0-9]+', '-', 'g'))
   );
   return new;
@@ -130,6 +160,41 @@ create table if not exists bookings (
 create index if not exists bookings_member_date_idx on bookings (member_id, booking_date);
 create index if not exists bookings_email_idx on bookings (lower(guest_email));
 
+alter table bookings add column if not exists confirmation_sent boolean not null default false;
+alter table bookings add column if not exists reminder_24h_sent boolean not null default false;
+alter table bookings add column if not exists reminder_1h_sent boolean not null default false;
+
+-- ---------------------------------------------------------------------------
+-- Spam protection: enforced in the database, so it can't be bypassed even if
+-- someone disables JavaScript or calls the API directly. Blocks a burst of
+-- bookings from the same email address. Tune the numbers to taste.
+-- ---------------------------------------------------------------------------
+create or replace function enforce_booking_rate_limit()
+returns trigger as $$
+declare
+  recent_count int;
+  daily_count int;
+begin
+  select count(*) into recent_count from bookings
+    where lower(guest_email) = lower(new.guest_email) and created_at > now() - interval '10 minutes';
+  if recent_count >= 3 then
+    raise exception 'Too many booking attempts. Please wait a few minutes and try again.';
+  end if;
+
+  select count(*) into daily_count from bookings
+    where lower(guest_email) = lower(new.guest_email) and created_at > now() - interval '24 hours';
+  if daily_count >= 10 then
+    raise exception 'Too many bookings from this email today. Please contact us directly.';
+  end if;
+
+  return new;
+end;
+$$ language plpgsql security definer;
+
+drop trigger if exists bookings_rate_limit on bookings;
+create trigger bookings_rate_limit before insert on bookings
+  for each row execute procedure enforce_booking_rate_limit();
+
 create table if not exists group_attendees (
   id uuid primary key default gen_random_uuid(),
   booking_id uuid not null references bookings(id) on delete cascade,
@@ -157,6 +222,7 @@ create table if not exists waitlist (
 -- ---------------------------------------------------------------------------
 create table if not exists org_settings (
   id int primary key default 1,
+  org_name text not null default 'Schedlr',
   buffer_minutes int not null default 15,
   notice_hours int not null default 4,
   daily_cap int not null default 6,
@@ -165,6 +231,7 @@ create table if not exists org_settings (
   constraint single_row check (id = 1)
 );
 insert into org_settings (id) values (1) on conflict (id) do nothing;
+alter table org_settings add column if not exists org_name text not null default 'Schedlr';
 
 create table if not exists audit_log (
   id uuid primary key default gen_random_uuid(),
@@ -172,6 +239,31 @@ create table if not exists audit_log (
   action text not null,
   created_at timestamptz not null default now()
 );
+
+-- ============================================================================
+-- STORAGE: avatar photos (self-upload) and org branding logo (any staff)
+-- ============================================================================
+
+insert into storage.buckets (id, name, public) values ('avatars', 'avatars', true) on conflict (id) do nothing;
+insert into storage.buckets (id, name, public) values ('branding', 'branding', true) on conflict (id) do nothing;
+
+-- Note: storage.objects already has Row Level Security enabled by default on
+-- Supabase projects — attempting to re-enable it here would fail with a
+-- permissions error, so we just define policies against it directly below.
+
+drop policy if exists "avatars_select_public" on storage.objects;
+create policy "avatars_select_public" on storage.objects for select using (bucket_id = 'avatars');
+drop policy if exists "avatars_insert_self" on storage.objects;
+create policy "avatars_insert_self" on storage.objects for insert with check (bucket_id = 'avatars' and name like (auth.uid()::text || '-%'));
+drop policy if exists "avatars_update_self" on storage.objects;
+create policy "avatars_update_self" on storage.objects for update using (bucket_id = 'avatars' and name like (auth.uid()::text || '-%'));
+drop policy if exists "avatars_delete_self" on storage.objects;
+create policy "avatars_delete_self" on storage.objects for delete using (bucket_id = 'avatars' and name like (auth.uid()::text || '-%'));
+
+drop policy if exists "branding_select_public" on storage.objects;
+create policy "branding_select_public" on storage.objects for select using (bucket_id = 'branding');
+drop policy if exists "branding_write_staff" on storage.objects;
+create policy "branding_write_staff" on storage.objects for all using (bucket_id = 'branding' and auth.role() = 'authenticated') with check (bucket_id = 'branding' and auth.role() = 'authenticated');
 
 -- ============================================================================
 -- ROW LEVEL SECURITY

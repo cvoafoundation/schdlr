@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { Panel, Field, Row, BackLink, StepRail, LoadingBlock, ErrorBlock } from "../components/ui.jsx";
+import { Panel, Field, Row, BackLink, StepRail, LoadingBlock, ErrorBlock, Avatar } from "../components/ui.jsx";
 import {
   addDays, isWeekend, isSameDay, toDateInput, toDateOnly, fmtTime,
   buildAvailabilityIndex, isMemberBlockedOnDate, meetingCount, getSlotsForMember,
@@ -257,7 +257,7 @@ export default function BookingPage() {
               const active = member.id === m.id;
               return (
                 <button key={m.id} onClick={() => setMember(m)} className={`cv-member-card text-left px-5 py-4 flex items-center gap-4 ${active ? "cv-member-card-active" : ""}`}>
-                  <span className={`cv-member-badge font-mono text-xs w-9 h-9 flex items-center justify-center shrink-0 ${active ? "cv-member-badge-active" : ""}`}>{m.initials}</span>
+                  <Avatar member={m} size={36} className={active ? "cv-member-badge-active" : ""} />
                   <div><div className="font-semibold">{m.name}</div><div className="cv-graphite text-xs font-mono">{m.role}</div></div>
                 </button>
               );

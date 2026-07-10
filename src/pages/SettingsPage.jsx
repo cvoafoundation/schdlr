@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { Panel, Field, LoadingBlock, ErrorBlock } from "../components/ui.jsx";
+import { Panel, Field, LoadingBlock, ErrorBlock, Avatar } from "../components/ui.jsx";
 
 const ACCENTS = [
   { name: "Signal Red", value: "#B3261E" }, { name: "Field Blue", value: "#1E4FB3" },
@@ -14,6 +14,7 @@ export default function SettingsPage() {
   const [auditLog, setAuditLog] = useState([]);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://cvoa.org";
 
   async function load() {
@@ -21,7 +22,7 @@ export default function SettingsPage() {
     const [s, m, a] = await Promise.all([
       supabase.from("org_settings").select("*").single(),
       supabase.from("team_members").select("*").order("name"),
-      supabase.from("audit_log").select("*, team_members(name, initials)").order("created_at", { ascending: false }).limit(20),
+      supabase.from("audit_log").select("*, team_members(name, initials, avatar_url)").order("created_at", { ascending: false }).limit(20),
     ]);
     setSettings(s.data);
     setMembers(m.data || []);
@@ -33,11 +34,35 @@ export default function SettingsPage() {
   async function saveSettings() {
     setError(""); setSaved(false);
     const { error } = await supabase.from("org_settings").update({
-      buffer_minutes: settings.buffer_minutes, notice_hours: settings.notice_hours,
+      org_name: settings.org_name, buffer_minutes: settings.buffer_minutes, notice_hours: settings.notice_hours,
       daily_cap: settings.daily_cap, accent_color: settings.accent_color,
     }).eq("id", 1);
     if (error) { setError(error.message); return; }
     setSaved(true); setTimeout(() => setSaved(false), 1500);
+  }
+
+  async function uploadLogo(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingLogo(true); setError("");
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `logo-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("branding").upload(path, file, { cacheControl: "3600", upsert: false });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("branding").getPublicUrl(path);
+      const { error: updErr } = await supabase.from("org_settings").update({ logo_url: pub.publicUrl }).eq("id", 1);
+      if (updErr) throw updErr;
+      setSettings((s) => ({ ...s, logo_url: pub.publicUrl }));
+    } catch (err) {
+      setError(err.message || "Couldn't upload that logo.");
+    } finally {
+      setUploadingLogo(false);
+    }
+  }
+  async function removeLogo() {
+    await supabase.from("org_settings").update({ logo_url: null }).eq("id", 1);
+    setSettings((s) => ({ ...s, logo_url: null }));
   }
 
   function copy(link) { if (navigator.clipboard) navigator.clipboard.writeText(link); }
@@ -47,6 +72,29 @@ export default function SettingsPage() {
   return (
     <div className="space-y-8">
       {error && <ErrorBlock message={error} />}
+      <Panel className="cv-card">
+        <div className="font-display font-bold text-lg mb-1">Branding</div>
+        <div className="cv-graphite text-sm mb-5">
+          The name and logo shown throughout the app — this is the whole toolkit for reskinning a deployment for a
+          different organization.
+        </div>
+        <div className="grid sm:grid-cols-2 gap-5 mb-6">
+          <Field label="Organization name">
+            <input value={settings.org_name || ""} onChange={(e) => setSettings({ ...settings, org_name: e.target.value })} className="cv-input w-full py-2" placeholder="Schedlr" />
+          </Field>
+        </div>
+        <div className="flex items-center gap-5 flex-wrap mb-2">
+          <div className="cv-logo-box w-16 h-16 flex items-center justify-center shrink-0">
+            {settings.logo_url ? <img src={settings.logo_url} alt="Logo" className="max-w-full max-h-full" /> : <span className="cv-faint text-[10px] font-mono">NO LOGO</span>}
+          </div>
+          <label className="cv-btn-outline px-4 py-2 font-mono text-xs tracking-widest uppercase cursor-pointer flex items-center gap-2">
+            {uploadingLogo ? "Uploading…" : "Upload logo"}
+            <input type="file" accept="image/*" className="hidden" disabled={uploadingLogo} onChange={uploadLogo} />
+          </label>
+          {settings.logo_url && <button onClick={removeLogo} className="cv-link font-mono text-xs tracking-widest uppercase">Remove</button>}
+        </div>
+      </Panel>
+
       <Panel className="cv-card">
         <div className="font-display font-bold text-lg mb-1">Scheduling rules</div>
         <div className="cv-graphite text-sm mb-5">Applies across the whole team's public booking page.</div>
@@ -95,7 +143,7 @@ export default function SettingsPage() {
             {auditLog.map((a) => (
               <div key={a.id} className="cv-row flex items-center justify-between px-4 py-2.5">
                 <div className="flex items-center gap-3">
-                  <span className="cv-pill-badge font-mono text-[9px] w-6 h-6 flex items-center justify-center border">{a.team_members?.initials || "?"}</span>
+                  <Avatar member={a.team_members} size={24} />
                   <span className="text-sm">{a.team_members?.name || "Someone"} {a.action}</span>
                 </div>
                 <span className="font-mono text-xs cv-faint">{new Date(a.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
