@@ -33,7 +33,7 @@ export default function AnalyticsPage() {
     async function load() {
       setLoading(true); setError("");
       const [b, m] = await Promise.all([
-        supabase.from("bookings").select("*").order("booking_date"),
+        supabase.from("bookings").select("*, event_types(is_group)").order("booking_date"),
         supabase.from("team_members").select("*").order("name"),
       ]);
       if (b.error) setError(b.error.message);
@@ -45,7 +45,7 @@ export default function AnalyticsPage() {
   }, []);
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const active = useMemo(() => bookings.filter((b) => b.status !== "canceled" && b.event_type_id !== "group"), [bookings]);
+  const active = useMemo(() => bookings.filter((b) => b.status !== "canceled" && !(b.event_types?.is_group)), [bookings]);
 
   const weekdayCounts = useMemo(() => {
     const counts = [0, 0, 0, 0, 0];

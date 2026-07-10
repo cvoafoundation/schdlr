@@ -30,7 +30,7 @@ export default function DashboardPage() {
   async function load() {
     setLoading(true); setError("");
     const [b, ga, m, wl, bd, ro, va, pb] = await Promise.all([
-      supabase.from("bookings").select("*").order("booking_date").order("start_minutes"),
+      supabase.from("bookings").select("*, event_types(is_group)").order("booking_date").order("start_minutes"),
       supabase.from("group_attendees").select("*"),
       supabase.from("team_members").select("*").order("name"),
       supabase.from("waitlist").select("*").order("created_at", { ascending: false }),
@@ -107,7 +107,7 @@ export default function DashboardPage() {
           <div className="space-y-2">
             {todaysBookings.map((b) => {
               const m = memberById(b.member_id);
-              const isGroup = b.event_type_id === "group";
+              const isGroup = b.event_types?.is_group ?? false;
               return (
                 <div key={b.id} className="cv-list-row w-full px-5 py-4 flex items-center gap-4 flex-wrap">
                   <div className="font-mono text-sm w-16 shrink-0">{fmtTime(b.start_minutes)}</div>
@@ -204,7 +204,7 @@ export default function DashboardPage() {
             {filtered.map((b) => {
               const m = memberById(b.member_id);
               const meta = statusMeta[b.status] || statusMeta.upcoming;
-              const isGroup = b.event_type_id === "group";
+              const isGroup = b.event_types?.is_group ?? false;
               const attendees = attendeesByBooking[b.id] || [];
               return (
                 <div key={b.id} className="cv-list-row w-full px-5 py-4 flex items-center gap-4 flex-wrap">

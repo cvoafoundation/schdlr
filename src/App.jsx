@@ -6,6 +6,7 @@ import { LoadingBlock } from "./components/ui.jsx";
 import BookingPage from "./pages/BookingPage.jsx";
 import ManagePage from "./pages/ManagePage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
+import OnboardingPage from "./pages/OnboardingPage.jsx";
 import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
 import TeamAvailabilityPage from "./pages/TeamAvailabilityPage.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
@@ -33,6 +34,7 @@ export default function App() {
       <Route path="/" element={<Layout><BookingPage /></Layout>} />
       <Route path="/manage" element={<Layout><ManagePage /></Layout>} />
       <Route path="/login" element={<Layout><LoginPage /></Layout>} />
+      <Route path="/onboarding" element={<RequireAuth><Layout><OnboardingPage /></Layout></RequireAuth>} />
       <Route path="/reset-password" element={<Layout><ResetPasswordPage /></Layout>} />
       <Route path="/team" element={<RequireAuth><Layout><TeamAvailabilityPage /></Layout></RequireAuth>} />
       <Route path="/dashboard" element={<RequireAuth><Layout><DashboardPage /></Layout></RequireAuth>} />

@@ -97,7 +97,7 @@ export default function BookingPage() {
   function isDateFull(d) {
     if (!index) return false;
     if (eventType?.is_group) {
-      const existing = bookingsRange.find((b) => b.event_type_id === "group" && isSameDay(toDateOnly(b.booking_date), d));
+      const existing = bookingsRange.find((b) => b.is_group && isSameDay(toDateOnly(b.booking_date), d));
       return existing ? existing.attendee_count >= eventType.capacity : false;
     }
     const check = (id) => meetingCount(id, d, bookingsRange) >= settings.daily_cap;
@@ -114,7 +114,7 @@ export default function BookingPage() {
     return perMember[0].map((s, idx) => ({ ...s, booked: perMember.every((ms) => ms[idx].booked) }));
   }, [selectedDate, eventType, member, settings, bookingsRange, index]);
 
-  const groupExisting = eventType?.is_group && selectedDate ? bookingsRange.find((b) => b.event_type_id === "group" && isSameDay(toDateOnly(b.booking_date), selectedDate)) : null;
+  const groupExisting = eventType?.is_group && selectedDate ? bookingsRange.find((b) => b.is_group && isSameDay(toDateOnly(b.booking_date), selectedDate)) : null;
   const groupFilled = groupExisting ? groupExisting.attendee_count : 0;
 
   function pickEvent(evt) {
@@ -167,7 +167,7 @@ export default function BookingPage() {
         let bookingId = groupExisting?.id;
         if (!bookingId) {
           const { data, error } = await supabase.from("bookings").insert({
-            event_type_id: "group", member_id: null, booking_date: toDateInput(selectedDate),
+            event_type_id: eventType.id, member_id: null, booking_date: toDateInput(selectedDate),
             start_minutes: eventType.fixed_minutes, duration_minutes: eventType.duration_minutes,
             guest_name: "Group session", guest_email: "group@cvoa.org", status: "upcoming", organization_id: orgId,
           }).select().single();

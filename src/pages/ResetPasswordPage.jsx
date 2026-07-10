@@ -21,7 +21,7 @@ export default function ResetPasswordPage() {
     setBusy(false);
     if (error) { setError(error.message); return; }
     setDone(true);
-    setTimeout(() => navigate("/dashboard"), 1500);
+    setTimeout(() => navigate("/onboarding"), 1500);
   }
 
   return (

@@ -32,7 +32,7 @@ export default function LoginPage() {
     const { error } = mode === "signin" ? await signIn(email, password) : await signUp(email, password, name);
     setBusy(false);
     if (error) { setError(error.message); return; }
-    navigate("/dashboard");
+    navigate("/onboarding");
   }
 
   return (
