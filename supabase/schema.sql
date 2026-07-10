@@ -241,29 +241,10 @@ create table if not exists audit_log (
 );
 
 -- ============================================================================
--- STORAGE: avatar photos (self-upload) and org branding logo (any staff)
+-- STORAGE (avatars + branding logo): set these up by clicking, not SQL —
+-- Supabase blocks creating storage policies from the SQL Editor on most
+-- projects. See the "Photos & logo" section in the setup instructions.
 -- ============================================================================
-
-insert into storage.buckets (id, name, public) values ('avatars', 'avatars', true) on conflict (id) do nothing;
-insert into storage.buckets (id, name, public) values ('branding', 'branding', true) on conflict (id) do nothing;
-
--- Note: storage.objects already has Row Level Security enabled by default on
--- Supabase projects — attempting to re-enable it here would fail with a
--- permissions error, so we just define policies against it directly below.
-
-drop policy if exists "avatars_select_public" on storage.objects;
-create policy "avatars_select_public" on storage.objects for select using (bucket_id = 'avatars');
-drop policy if exists "avatars_insert_self" on storage.objects;
-create policy "avatars_insert_self" on storage.objects for insert with check (bucket_id = 'avatars' and name like (auth.uid()::text || '-%'));
-drop policy if exists "avatars_update_self" on storage.objects;
-create policy "avatars_update_self" on storage.objects for update using (bucket_id = 'avatars' and name like (auth.uid()::text || '-%'));
-drop policy if exists "avatars_delete_self" on storage.objects;
-create policy "avatars_delete_self" on storage.objects for delete using (bucket_id = 'avatars' and name like (auth.uid()::text || '-%'));
-
-drop policy if exists "branding_select_public" on storage.objects;
-create policy "branding_select_public" on storage.objects for select using (bucket_id = 'branding');
-drop policy if exists "branding_write_staff" on storage.objects;
-create policy "branding_write_staff" on storage.objects for all using (bucket_id = 'branding' and auth.role() = 'authenticated') with check (bucket_id = 'branding' and auth.role() = 'authenticated');
 
 -- ============================================================================
 -- ROW LEVEL SECURITY

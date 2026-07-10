@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { Panel, LoadingBlock, ErrorBlock } from "../components/ui.jsx";
+import { Panel, LoadingBlock, ErrorBlock, EmptyState } from "../components/ui.jsx";
 import { addDays, isSameDay, toDateOnly } from "../lib/scheduling.js";
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -95,6 +95,15 @@ export default function AnalyticsPage() {
   }
 
   if (loading) return <LoadingBlock label="Crunching the numbers…" />;
+
+  if (active.length === 0) {
+    return (
+      <EmptyState
+        title="Nothing to analyze yet"
+        body="Once meetings start getting booked and marked complete, this page fills in with real trends — busiest days, no-show rates, and how far ahead people book."
+      />
+    );
+  }
 
   return (
     <div className="space-y-8">

@@ -81,6 +81,21 @@ export function Avatar({ member, size = 24, className = "" }) {
   );
 }
 
+export function EmptyState({ title, body, actionLabel, onAction, icon }) {
+  return (
+    <div className="cv-card text-center py-14 px-6">
+      {icon && <div className="flex justify-center mb-3 cv-faint">{icon}</div>}
+      <div className="font-display font-bold text-lg mb-1">{title}</div>
+      {body && <div className="cv-graphite text-sm mb-5 max-w-sm mx-auto">{body}</div>}
+      {actionLabel && onAction && (
+        <button onClick={onAction} className="cv-btn-primary px-5 py-2.5 font-mono text-xs tracking-widest uppercase">
+          {actionLabel}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function ErrorBlock({ message }) {
   return (
     <div className="cv-note font-mono text-sm px-4 py-3" style={{ borderColor: "var(--stamp)", color: "var(--stamp)" }}>

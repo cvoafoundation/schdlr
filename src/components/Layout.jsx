@@ -28,8 +28,8 @@ export default function Layout({ children }) {
           <div className="flex items-center gap-3">
             {org.logo_url && <img src={org.logo_url} alt="" className="w-9 h-9 object-contain" />}
             <div>
-              <div className="cv-graphite font-mono text-[11px] tracking-[0.3em] mb-2">{(org.org_name || "SCHEDLR").toUpperCase()}</div>
-              <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight">{org.org_name || "Schedlr"}</h1>
+              <div className="cv-graphite font-mono text-[11px] tracking-[0.3em] mb-1">{(org.org_name || "SCHEDLR").toUpperCase()}</div>
+              <h1 className="font-display text-4xl sm:text-5xl font-bold tracking-tight leading-none">{org.org_name || "Schedlr"}</h1>
             </div>
           </div>
         </div>
@@ -41,8 +41,8 @@ export default function Layout({ children }) {
             {user && (
               <>
                 <span className="cv-divider w-px self-stretch mx-1" />
+                <NavLink to="/dashboard" className={tabClass}>Home</NavLink>
                 <NavLink to="/team" className={tabClass}>Team availability</NavLink>
-                <NavLink to="/dashboard" className={tabClass}>Dashboard</NavLink>
                 <NavLink to="/analytics" className={tabClass}>Analytics</NavLink>
                 <NavLink to="/settings" className={tabClass}>Settings</NavLink>
               </>
