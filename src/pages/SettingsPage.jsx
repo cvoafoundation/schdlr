@@ -3,11 +3,6 @@ import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../hooks/useAuth";
 import { Panel, Field, LoadingBlock, ErrorBlock, Avatar } from "../components/ui.jsx";
 
-const ACCENTS = [
-  { name: "Signal Red", value: "#B3261E" }, { name: "Field Blue", value: "#1E4FB3" },
-  { name: "Olive", value: "#5B6B3A" }, { name: "Amber", value: "#B37B1E" }, { name: "Violet", value: "#6B3AB3" },
-];
-
 export default function SettingsPage() {
   const { orgId } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -46,7 +41,7 @@ export default function SettingsPage() {
     setError(""); setSaved(false);
     const { error } = await supabase.from("org_settings").update({
       org_name: settings.org_name, buffer_minutes: settings.buffer_minutes, notice_hours: settings.notice_hours,
-      daily_cap: settings.daily_cap, accent_color: settings.accent_color,
+      daily_cap: settings.daily_cap,
     }).eq("organization_id", orgId);
     if (error) { setError(error.message); return; }
     setSaved(true); setTimeout(() => setSaved(false), 1500);
@@ -105,11 +100,12 @@ export default function SettingsPage() {
           The name and logo shown throughout the app — this is the whole toolkit for reskinning a deployment for a
           different organization.
         </div>
-        <div className="grid sm:grid-cols-2 gap-5 mb-6">
+        <div className="grid sm:grid-cols-2 gap-5 mb-3">
           <Field label="Organization name">
             <input value={settings.org_name || ""} onChange={(e) => setSettings({ ...settings, org_name: e.target.value })} className="cv-input w-full py-2" placeholder="Schedlr" />
           </Field>
         </div>
+        <button onClick={saveSettings} className="cv-btn-primary px-4 py-2 font-mono text-xs tracking-widest uppercase mb-6">{saved ? "Saved ✓" : "Save name"}</button>
         <div className="flex items-center gap-5 flex-wrap mb-2">
           <div className="cv-logo-box w-16 h-16 flex items-center justify-center shrink-0">
             {settings.logo_url ? <img src={settings.logo_url} alt="Logo" className="max-w-full max-h-full" /> : <span className="cv-faint text-[10px] font-mono">NO LOGO</span>}
@@ -120,6 +116,7 @@ export default function SettingsPage() {
           </label>
           {settings.logo_url && <button onClick={removeLogo} className="cv-link font-mono text-xs tracking-widest uppercase">Remove</button>}
         </div>
+        <div className="cv-faint font-mono text-[10px] mt-2">Logo saves immediately when you pick a file — no separate save step needed.</div>
       </Panel>
 
       <Panel className="cv-card">
@@ -130,15 +127,7 @@ export default function SettingsPage() {
           <Field label="Minimum notice (hours)"><input type="number" min={0} step={1} value={settings.notice_hours} onChange={(e) => setSettings({ ...settings, notice_hours: Number(e.target.value) })} className="cv-input w-full py-2" /></Field>
           <Field label="Max meetings per day"><input type="number" min={1} step={1} value={settings.daily_cap} onChange={(e) => setSettings({ ...settings, daily_cap: Number(e.target.value) })} className="cv-input w-full py-2" /></Field>
         </div>
-        <div className="cv-graphite font-mono text-[10px] tracking-widest uppercase mt-6 mb-2">Accent color</div>
-        <div className="flex flex-wrap gap-2 mb-6">
-          {ACCENTS.map((a) => (
-            <button key={a.value} onClick={() => setSettings({ ...settings, accent_color: a.value })} className={`cv-swatch flex items-center gap-2 px-3 py-2 ${settings.accent_color === a.value ? "cv-swatch-active" : ""}`}>
-              <span className="w-3 h-3 rounded-full" style={{ background: a.value }} /><span className="text-xs font-mono">{a.name}</span>
-            </button>
-          ))}
-        </div>
-        <button onClick={saveSettings} className="cv-btn-primary px-5 py-2.5 font-mono text-xs tracking-widest uppercase">{saved ? "Saved ✓" : "Save changes"}</button>
+        <button onClick={saveSettings} className="cv-btn-primary px-5 py-2.5 font-mono text-xs tracking-widest uppercase mt-6">{saved ? "Saved ✓" : "Save changes"}</button>
       </Panel>
 
       <Panel className="cv-card">
