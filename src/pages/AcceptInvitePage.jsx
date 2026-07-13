@@ -7,7 +7,7 @@ import { Panel, Field, ErrorBlock, LoadingBlock } from "../components/ui.jsx";
 export default function AcceptInvitePage() {
   const { token } = useParams();
   const navigate = useNavigate();
-  const { user, loading: authLoading, signIn, signUp } = useAuth();
+  const { user, loading: authLoading, signIn, signUp, refreshProfile } = useAuth();
   const [preview, setPreview] = useState(null);
   const [loadingPreview, setLoadingPreview] = useState(true);
   const [mode, setMode] = useState("signup");
@@ -31,8 +31,9 @@ export default function AcceptInvitePage() {
   async function doAccept() {
     setBusy(true); setError("");
     const { error } = await supabase.rpc("accept_invitation", { p_token: token });
+    if (error) { setBusy(false); setAttempted(true); setError(error.message); return; }
+    await refreshProfile();
     setBusy(false); setAttempted(true);
-    if (error) { setError(error.message); return; }
     setAccepted(true);
     setTimeout(() => navigate("/dashboard", { replace: true }), 1200);
   }

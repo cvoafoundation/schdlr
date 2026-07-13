@@ -17,6 +17,7 @@ export default function SettingsPage() {
   const [inviteRole, setInviteRole] = useState("staff");
   const [invitingBusy, setInvitingBusy] = useState(false);
   const [newInviteLink, setNewInviteLink] = useState("");
+  const [inviteEmailStatus, setInviteEmailStatus] = useState("");
   const [copiedInvite, setCopiedInvite] = useState(false);
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://cvoa.org";
 
@@ -75,11 +76,24 @@ export default function SettingsPage() {
 
   async function createInvite(e) {
     e.preventDefault();
-    setError(""); setInvitingBusy(true); setNewInviteLink("");
+    setError(""); setInvitingBusy(true); setNewInviteLink(""); setInviteEmailStatus("");
     const { data: token, error } = await supabase.rpc("create_invitation", { p_org_id: orgId, p_email: inviteEmail, p_role: inviteRole });
+    if (error) { setInvitingBusy(false); setError(error.message); return; }
+    const link = `${baseUrl}/accept-invite/${token}`;
+    setNewInviteLink(link);
+
+    try {
+      const resp = await fetch("/api/send-invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: inviteEmail, role: inviteRole, invite_link: link, organization_name: settings?.org_name }),
+      });
+      setInviteEmailStatus(resp.ok ? "sent" : "failed");
+    } catch {
+      setInviteEmailStatus("failed");
+    }
+
     setInvitingBusy(false);
-    if (error) { setError(error.message); return; }
-    setNewInviteLink(`${baseUrl}/accept-invite/${token}`);
     setInviteEmail("");
     load();
   }
@@ -154,11 +168,17 @@ export default function SettingsPage() {
         </form>
 
         {newInviteLink && (
-          <div className="cv-note font-mono text-[11px] mb-5 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+          <div className="cv-note font-mono text-[11px] mb-2 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
             <span className="break-all">{newInviteLink}</span>
             <button onClick={() => { copy(newInviteLink); setCopiedInvite(true); setTimeout(() => setCopiedInvite(false), 1500); }} className="cv-btn-outline px-3 py-1.5 uppercase tracking-widest shrink-0">
               {copiedInvite ? "Copied ✓" : "Copy link"}
             </button>
+          </div>
+        )}
+        {inviteEmailStatus === "sent" && <div className="font-mono text-[10px] mb-5" style={{ color: "var(--ink)" }}>✓ Email sent</div>}
+        {inviteEmailStatus === "failed" && (
+          <div className="cv-faint font-mono text-[10px] mb-5">
+            Couldn't send the email automatically (email sending may not be set up yet) — copy the link above and send it yourself.
           </div>
         )}
 

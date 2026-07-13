@@ -9,7 +9,7 @@ function slugify(v) {
 }
 
 export default function OnboardingPage() {
-  const { user, orgId, loading: authLoading } = useAuth();
+  const { user, orgId, loading: authLoading, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
   const [orgName, setOrgName] = useState("");
@@ -49,8 +49,9 @@ export default function OnboardingPage() {
     setError(""); setBusy(true);
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/New_York";
     const { data, error } = await supabase.rpc("create_organization", { p_org_name: orgName, p_slug: slug, p_timezone: timezone });
+    if (error) { setBusy(false); setError(error.message); return; }
+    await refreshProfile();
     setBusy(false);
-    if (error) { setError(error.message); return; }
     navigate("/dashboard", { replace: true });
   }
 
