@@ -11,7 +11,7 @@ function greeting() {
 }
 
 export default function DashboardPage() {
-  const { profile } = useAuth();
+  const { profile, orgId } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [bookings, setBookings] = useState([]);
@@ -32,7 +32,7 @@ export default function DashboardPage() {
     const [b, ga, m, wl, bd, ro, va, pb] = await Promise.all([
       supabase.from("bookings").select("*, event_types(is_group)").order("booking_date").order("start_minutes"),
       supabase.from("group_attendees").select("*"),
-      supabase.from("team_members").select("*").order("name"),
+      supabase.from("organization_members").select("*").eq("organization_id", orgId).eq("status", "active").order("display_name"),
       supabase.from("waitlist").select("*").order("created_at", { ascending: false }),
       supabase.from("blocked_dates").select("*"),
       supabase.from("recurring_days_off").select("*"),
@@ -41,7 +41,7 @@ export default function DashboardPage() {
     ]);
     if (b.error) setError(b.error.message);
     setBookings(b.data || []);
-    setMembers(m.data || []);
+    setMembers((m.data || []).map((mm) => ({ id: mm.user_id, name: mm.display_name, initials: mm.initials, avatar_url: mm.avatar_url, role: mm.role })));
     setWaitlist(wl.data || []);
     setAvailIndex(buildAvailabilityIndex({ blockedDates: bd.data || [], recurringOff: ro.data || [], vacations: va.data || [], partialBlocks: pb.data || [] }));
     const grouped = {};
@@ -49,7 +49,7 @@ export default function DashboardPage() {
     setAttendeesByBooking(grouped);
     setLoading(false);
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => { if (orgId) load(); }, [orgId]);
 
   async function setStatus(id, status) { await supabase.from("bookings").update({ status }).eq("id", id); load(); }
   async function remove(id) { await supabase.from("bookings").delete().eq("id", id); load(); }

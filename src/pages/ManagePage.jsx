@@ -40,15 +40,16 @@ export default function ManagePage() {
 
   async function loadSlotsForReschedule(booking, dateStr) {
     if (!dateStr) { setNewSlots([]); return; }
+    const orgId = booking.organization_id;
     const [bd, ro, va, pb] = await Promise.all([
-      supabase.from("blocked_dates").select("*"),
-      supabase.from("recurring_days_off").select("*"),
-      supabase.from("vacations").select("*"),
-      supabase.from("partial_blocks").select("*"),
+      supabase.from("blocked_dates").select("*").eq("organization_id", orgId),
+      supabase.from("recurring_days_off").select("*").eq("organization_id", orgId),
+      supabase.from("vacations").select("*").eq("organization_id", orgId),
+      supabase.from("partial_blocks").select("*").eq("organization_id", orgId),
     ]);
     const idx = buildAvailabilityIndex({ blockedDates: bd.data || [], recurringOff: ro.data || [], vacations: va.data || [], partialBlocks: pb.data || [] });
     const from = dateStr, to = dateStr;
-    const { data: busy } = await supabase.rpc("public_booking_slots", { p_from: from, p_to: to });
+    const { data: busy } = await supabase.rpc("public_booking_slots", { p_org_id: orgId, p_from: from, p_to: to });
     const date = toDateOnly(dateStr);
     const slots = getSlotsForMember(date, booking.duration_minutes, booking.member_id, settings, busy || [], idx);
     setNewSlots(slots);

@@ -29,16 +29,23 @@ export default function TeamAvailabilityPage() {
   const [photoError, setPhotoError] = useState("");
 
   async function loadAll() {
+    if (!orgId) return;
     setLoading(true); setError("");
-    const [m, bd, ro, va, pb] = await Promise.all([
-      supabase.from("team_members").select("*").order("name"),
-      supabase.from("blocked_dates").select("*"),
-      supabase.from("recurring_days_off").select("*"),
-      supabase.from("vacations").select("*"),
-      supabase.from("partial_blocks").select("*"),
+    const [m, tm, bd, ro, va, pb] = await Promise.all([
+      supabase.from("organization_members").select("*").eq("organization_id", orgId).eq("status", "active").order("display_name"),
+      supabase.from("team_members").select("id, avatar_url"),
+      supabase.from("blocked_dates").select("*").eq("organization_id", orgId),
+      supabase.from("recurring_days_off").select("*").eq("organization_id", orgId),
+      supabase.from("vacations").select("*").eq("organization_id", orgId),
+      supabase.from("partial_blocks").select("*").eq("organization_id", orgId),
     ]);
     if (m.error) setError(m.error.message);
-    setMembers(m.data || []);
+    const avatarById = {};
+    (tm.data || []).forEach((t) => { avatarById[t.id] = t.avatar_url; });
+    setMembers((m.data || []).map((mm) => ({
+      id: mm.user_id, name: mm.display_name, role: mm.job_title || "", initials: mm.initials,
+      avatar_url: avatarById[mm.user_id] || mm.avatar_url,
+    })));
     setBlockedDates(bd.data || []);
     setRecurringOff(ro.data || []);
     setVacations(va.data || []);
@@ -47,7 +54,7 @@ export default function TeamAvailabilityPage() {
     setLoading(false);
   }
 
-  useEffect(() => { loadAll(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [profile]);
+  useEffect(() => { loadAll(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [profile, orgId]);
 
   const index = useMemo(
     () => buildAvailabilityIndex({

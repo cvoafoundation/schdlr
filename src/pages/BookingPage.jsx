@@ -17,6 +17,7 @@ function fmtDateShort(d) { return d.toLocaleDateString(undefined, { month: "shor
 export default function BookingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [orgId, setOrgId] = useState(null);
   const [members, setMembers] = useState([]);
   const [eventTypes, setEventTypes] = useState([]);
   const [settings, setSettings] = useState(null);
@@ -41,33 +42,41 @@ export default function BookingPage() {
 
   async function loadStatic() {
     setLoading(true); setError("");
+    // Bridge until Stage 4 builds real /book/:slug URLs — every public page
+    // currently resolves to CVOA specifically. This is the one deliberate
+    // hardcode in the app; everything downstream of it is properly scoped.
+    const { data: resolvedOrgId, error: orgErr } = await supabase.rpc("get_org_id_by_slug", { p_slug: "cvoa" });
+    if (orgErr || !resolvedOrgId) { setError("Couldn't load this booking page."); setLoading(false); return; }
+    setOrgId(resolvedOrgId);
+
     const [m, et, s] = await Promise.all([
-      supabase.from("team_members").select("*").order("name"),
-      supabase.from("event_types").select("*").order("sort_order"),
-      supabase.from("org_settings").select("*").single(),
+      supabase.from("organization_members").select("*").eq("organization_id", resolvedOrgId).eq("status", "active").eq("is_bookable", true).order("display_name"),
+      supabase.from("event_types").select("*").eq("organization_id", resolvedOrgId).order("sort_order"),
+      supabase.from("org_settings").select("*").eq("organization_id", resolvedOrgId).single(),
     ]);
     if (m.error || et.error || s.error) setError((m.error || et.error || s.error).message);
-    setMembers(m.data || []);
+    setMembers((m.data || []).map((mm) => ({ id: mm.user_id, name: mm.display_name, role: mm.job_title || "Team member", initials: mm.initials, avatar_url: mm.avatar_url })));
     setEventTypes(et.data || []);
     setSettings(s.data || { buffer_minutes: 15, notice_hours: 4, daily_cap: 6 });
     setLoading(false);
   }
   useEffect(() => { loadStatic(); }, []);
 
-  async function loadAvailabilityAndBookings() {
+  async function loadAvailabilityAndBookings(currentOrgId) {
+    if (!currentOrgId) return;
     const from = toDateInput(new Date());
     const to = toDateInput(addDays(new Date(), 60));
     const [bd, ro, va, pb, slots] = await Promise.all([
-      supabase.from("blocked_dates").select("*"),
-      supabase.from("recurring_days_off").select("*"),
-      supabase.from("vacations").select("*"),
-      supabase.from("partial_blocks").select("*"),
-      supabase.rpc("public_booking_slots", { p_from: from, p_to: to }),
+      supabase.from("blocked_dates").select("*").eq("organization_id", currentOrgId),
+      supabase.from("recurring_days_off").select("*").eq("organization_id", currentOrgId),
+      supabase.from("vacations").select("*").eq("organization_id", currentOrgId),
+      supabase.from("partial_blocks").select("*").eq("organization_id", currentOrgId),
+      supabase.rpc("public_booking_slots", { p_org_id: currentOrgId, p_from: from, p_to: to }),
     ]);
     setIndex(buildAvailabilityIndex({ blockedDates: bd.data || [], recurringOff: ro.data || [], vacations: va.data || [], partialBlocks: pb.data || [] }));
     setBookingsRange((slots.data || []).map((b) => ({ ...b, member_id: b.member_id })));
   }
-  useEffect(() => { loadAvailabilityAndBookings(); }, []);
+  useEffect(() => { if (orgId) loadAvailabilityAndBookings(orgId); }, [orgId]);
 
   const teamIds = members.map((m) => m.id);
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -224,13 +233,12 @@ export default function BookingPage() {
     setStep("event"); setEventType(null); setMember(ANY); setSelectedDate(null); setSelectedSlot(null);
     setForm({ name: "", email: "", phone: "", notes: "" }); setUrgent(false); setUrgentMsg("");
     setSeriesRepeat({ enabled: false, cadence: "biweekly", count: 3 }); setConfirmedBooking(null);
-    loadAvailabilityAndBookings();
+    loadAvailabilityAndBookings(orgId);
   }
 
   if (loading || !index) return <LoadingBlock label="Loading booking page…" />;
 
   const hostLabel = member.id === "any" ? "next available team member" : `${member.name} — ${member.role}`;
-  const orgId = settings?.organization_id ?? null;
 
   return (
     <div>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { useAuth } from "../hooks/useAuth";
 import { Panel, LoadingBlock, ErrorBlock, EmptyState } from "../components/ui.jsx";
 import { addDays, isSameDay, toDateOnly } from "../lib/scheduling.js";
 
@@ -24,25 +25,27 @@ function toCsvValue(v) {
 }
 
 export default function AnalyticsPage() {
+  const { orgId } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [bookings, setBookings] = useState([]);
   const [members, setMembers] = useState([]);
 
   useEffect(() => {
+    if (!orgId) return;
     async function load() {
       setLoading(true); setError("");
       const [b, m] = await Promise.all([
         supabase.from("bookings").select("*, event_types(is_group)").order("booking_date"),
-        supabase.from("team_members").select("*").order("name"),
+        supabase.from("organization_members").select("*").eq("organization_id", orgId).eq("status", "active").order("display_name"),
       ]);
       if (b.error) setError(b.error.message);
       setBookings(b.data || []);
-      setMembers(m.data || []);
+      setMembers((m.data || []).map((mm) => ({ id: mm.user_id, name: mm.display_name, initials: mm.initials })));
       setLoading(false);
     }
     load();
-  }, []);
+  }, [orgId]);
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const active = useMemo(() => bookings.filter((b) => b.status !== "canceled" && !(b.event_types?.is_group)), [bookings]);
