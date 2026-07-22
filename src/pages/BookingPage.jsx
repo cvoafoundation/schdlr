@@ -50,7 +50,7 @@ export default function BookingPage() {
     setOrgId(resolvedOrgId);
 
     const [m, et, s] = await Promise.all([
-      supabase.from("organization_members").select("*").eq("organization_id", resolvedOrgId).eq("status", "active").eq("is_bookable", true).order("display_name"),
+      supabase.rpc("get_public_org_roster", { p_org_id: resolvedOrgId }),
       supabase.from("event_types").select("*").eq("organization_id", resolvedOrgId).order("sort_order"),
       supabase.from("org_settings").select("*").eq("organization_id", resolvedOrgId).single(),
     ]);
