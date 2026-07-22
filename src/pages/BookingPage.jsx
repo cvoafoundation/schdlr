@@ -236,6 +236,7 @@ export default function BookingPage() {
     loadAvailabilityAndBookings(orgId);
   }
 
+  if (error && !loading) return <div className="max-w-md mx-auto"><ErrorBlock message={error} /></div>;
   if (loading || !index) return <LoadingBlock label="Loading booking page…" />;
 
   const hostLabel = member.id === "any" ? "next available team member" : `${member.name} — ${member.role}`;

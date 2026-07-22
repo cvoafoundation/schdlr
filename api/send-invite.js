@@ -20,13 +20,14 @@ export default async function handler(req, res) {
 
   const orgName = organization_name || "the team";
   const fromAddress = process.env.INVITE_FROM_EMAIL || "onboarding@resend.dev";
+  const fromHeader = `${orgName} <${fromAddress}>`;
 
   try {
     const resp = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        from: fromAddress,
+        from: fromHeader,
         to: email,
         subject: `You're invited to join ${orgName}`,
         html: `
