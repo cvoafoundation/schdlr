@@ -96,6 +96,34 @@ export function EmptyState({ title, body, actionLabel, onAction, icon }) {
   );
 }
 
+export async function copyTextRobust(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+    throw new Error("Clipboard API unavailable");
+  } catch {
+    // Fallback for restricted contexts (e.g. third-party iframes like a Wix
+    // embed) where the modern Clipboard API is blocked. This older technique
+    // works in far more embedded contexts.
+    try {
+      const el = document.createElement("textarea");
+      el.value = text;
+      el.style.position = "fixed";
+      el.style.opacity = "0";
+      document.body.appendChild(el);
+      el.focus();
+      el.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(el);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
 export function ErrorBlock({ message }) {
   return (
     <div className="cv-note font-mono text-sm px-4 py-3" style={{ borderColor: "var(--stamp)", color: "var(--stamp)" }}>

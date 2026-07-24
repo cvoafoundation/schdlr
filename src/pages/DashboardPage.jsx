@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../hooks/useAuth";
-import { Panel, Avatar, LoadingBlock, ErrorBlock, EmptyState } from "../components/ui.jsx";
+import { Panel, Avatar, LoadingBlock, ErrorBlock, EmptyState, copyTextRobust } from "../components/ui.jsx";
 import { fmtTime, toDateOnly, downloadIcs, isWeekend, isMemberBlockedOnDate, buildAvailabilityIndex, toDateInput } from "../lib/scheduling.js";
 
 function fmtDateShort(d) { return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }); }
@@ -20,6 +20,7 @@ export default function DashboardPage() {
   const [waitlist, setWaitlist] = useState([]);
   const [availIndex, setAvailIndex] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [showManualLink, setShowManualLink] = useState(false);
   const [personFilter, setPersonFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("active");
   const [dateFilter, setDateFilter] = useState("");
@@ -54,9 +55,11 @@ export default function DashboardPage() {
   async function setStatus(id, status) { await supabase.from("bookings").update({ status }).eq("id", id); load(); }
   async function remove(id) { await supabase.from("bookings").delete().eq("id", id); load(); }
   function memberById(id) { return members.find((m) => m.id === id); }
-  function copyLink() {
-    if (navigator.clipboard) navigator.clipboard.writeText(`${baseUrl}/`);
-    setCopied(true); setTimeout(() => setCopied(false), 1500);
+  async function copyLink() {
+    const link = `${baseUrl}/`;
+    const ok = await copyTextRobust(link);
+    if (ok) { setCopied(true); setTimeout(() => setCopied(false), 1500); }
+    else { setShowManualLink(true); }
   }
 
   const todaysBookings = bookings.filter((b) => b.status === "upcoming" && isSameDayStr(b.booking_date, today));
@@ -92,6 +95,16 @@ export default function DashboardPage() {
           {copied ? "Copied ✓" : "Copy booking link"}
         </button>
       </div>
+
+      {showManualLink && (
+        <div className="cv-note font-mono text-[11px] px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+          <span>Couldn't copy automatically (common inside embedded pages) — select the link below and copy it manually:</span>
+          <input
+            readOnly value={`${baseUrl}/`} onFocus={(e) => e.target.select()}
+            className="cv-input py-1.5 px-2 flex-1 min-w-[220px]"
+          />
+        </div>
+      )}
 
       {/* ---- Today's appointments ---- */}
       <div>

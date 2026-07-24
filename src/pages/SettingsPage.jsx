@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../hooks/useAuth";
-import { Panel, Field, LoadingBlock, ErrorBlock, Avatar } from "../components/ui.jsx";
+import { Panel, Field, LoadingBlock, ErrorBlock, Avatar, copyTextRobust } from "../components/ui.jsx";
 
 export default function SettingsPage() {
   const { orgId } = useAuth();
@@ -72,7 +72,7 @@ export default function SettingsPage() {
     setSettings((s) => ({ ...s, logo_url: null }));
   }
 
-  function copy(link) { if (navigator.clipboard) navigator.clipboard.writeText(link); }
+  function copy(link) { copyTextRobust(link); }
 
   async function createInvite(e) {
     e.preventDefault();

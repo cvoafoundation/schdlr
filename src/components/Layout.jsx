@@ -72,6 +72,7 @@ export default function Layout({ children }) {
         {children}
 
         <div className="mt-16 pt-5 cv-graphite font-mono text-[10px] tracking-widest flex items-center gap-2" style={{ borderTop: "1px solid var(--line)" }}>
+          <img src="/schedlr-mark.png" alt="" className="w-4 h-4 object-contain" />
           {(org.org_name || "SCHEDLR").toUpperCase()}
         </div>
       </div>
