@@ -4,7 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { Panel, Field, LoadingBlock, ErrorBlock, Avatar, copyTextRobust } from "../components/ui.jsx";
 
 export default function SettingsPage() {
-  const { orgId, organization } = useAuth();
+  const { orgId } = useAuth();
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState(null);
   const [members, setMembers] = useState([]);
@@ -19,7 +19,7 @@ export default function SettingsPage() {
   const [newInviteLink, setNewInviteLink] = useState("");
   const [inviteEmailStatus, setInviteEmailStatus] = useState("");
   const [copiedInvite, setCopiedInvite] = useState(false);
-  const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://schdlr.vercel.app";
+  const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://cvoa.org";
 
   async function load() {
     if (!orgId) return;
@@ -54,7 +54,7 @@ export default function SettingsPage() {
     setUploadingLogo(true); setError("");
     try {
       const ext = file.name.split(".").pop();
-      const path = `${orgId}/logo-${Date.now()}.${ext}`;
+      const path = `logo-${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage.from("branding").upload(path, file, { cacheControl: "3600", upsert: false });
       if (upErr) throw upErr;
       const { data: pub } = supabase.storage.from("branding").getPublicUrl(path);
@@ -83,10 +83,9 @@ export default function SettingsPage() {
     setNewInviteLink(link);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
       const resp = await fetch("/api/send-invite", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token || ""}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: inviteEmail, role: inviteRole, invite_link: link, organization_name: settings?.org_name }),
       });
       setInviteEmailStatus(resp.ok ? "sent" : "failed");
@@ -148,10 +147,12 @@ export default function SettingsPage() {
       <Panel className="cv-card">
         <div className="font-display font-bold text-lg mb-1">Team</div>
         <div className="cv-graphite text-sm mb-5">
-          Invite teammates to this organization. If automatic email is unavailable, copy their invitation link and share it directly.
+          Invite teammates by email — they'll create their own login and land directly in this organization, never
+          able to accidentally join a different one. Since there's no email sending wired up yet, copy the link and
+          send it yourself however you'd like.
         </div>
 
-        {organization?.managed_by === "cvoa" ? <p className="cv-note p-4 mb-5">Staff access comes from current appointments in CVOA.ONE Accounts &amp; Access.</p> : <form onSubmit={createInvite} className="flex flex-wrap items-end gap-3 mb-5">
+        <form onSubmit={createInvite} className="flex flex-wrap items-end gap-3 mb-5">
           <div className="flex-1 min-w-[200px]">
             <Field label="Email"><input type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} className="cv-input w-full py-2" placeholder="teammate@example.com" required /></Field>
           </div>
@@ -164,7 +165,7 @@ export default function SettingsPage() {
           <button disabled={invitingBusy} type="submit" className="cv-btn-primary px-4 py-2.5 font-mono text-xs tracking-widest uppercase">
             {invitingBusy ? "Creating…" : "Create invite"}
           </button>
-        </form>}
+        </form>
 
         {newInviteLink && (
           <div className="cv-note font-mono text-[11px] mb-2 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
@@ -214,18 +215,19 @@ export default function SettingsPage() {
         <div className="cv-graphite text-sm mb-5">Share a teammate's link directly, or use the general page for team-routed booking.</div>
         <div className="space-y-2">
           <div className="cv-row flex items-center justify-between px-4 py-3">
-            <div><div className="text-sm font-semibold">General booking page</div><div className="font-mono text-xs cv-graphite">{baseUrl}/book/{organization?.slug}</div></div>
-            <button onClick={() => copy(`${baseUrl}/book/${organization?.slug}`)} className="cv-btn-outline px-3 py-1.5 font-mono text-[10px] tracking-widest uppercase">Copy</button>
+            <div><div className="text-sm font-semibold">General booking page</div><div className="font-mono text-xs cv-graphite">{baseUrl}/</div></div>
+            <button onClick={() => copy(`${baseUrl}/`)} className="cv-btn-outline px-3 py-1.5 font-mono text-[10px] tracking-widest uppercase">Copy</button>
           </div>
           {members.map((m) => (
             <div key={m.id} className="cv-row flex items-center justify-between px-4 py-3">
-              <div><div className="text-sm font-semibold">{m.display_name}</div><div className="font-mono text-xs cv-graphite">{baseUrl}/book/{organization?.slug}?with={m.user_id}</div></div>
-              <button onClick={() => copy(`${baseUrl}/book/${organization?.slug}?with=${m.user_id}`)} className="cv-btn-outline px-3 py-1.5 font-mono text-[10px] tracking-widest uppercase">Copy</button>
+              <div><div className="text-sm font-semibold">{m.display_name}</div><div className="font-mono text-xs cv-graphite">{baseUrl}/?with={m.booking_slug}</div></div>
+              <button onClick={() => copy(`${baseUrl}/?with=${m.booking_slug}`)} className="cv-btn-outline px-3 py-1.5 font-mono text-[10px] tracking-widest uppercase">Copy</button>
             </div>
           ))}
         </div>
         <div className="cv-note font-mono text-[11px] mt-4 px-4 py-3">
-          Share a team booking link or a personal link for a bookable staff member.
+          Note: the ?with= parameter is a placeholder — wiring it up to auto-select that teammate on the booking
+          page is a quick follow-up (read the query string in BookingPage.jsx and preset `member`).
         </div>
       </Panel>
 

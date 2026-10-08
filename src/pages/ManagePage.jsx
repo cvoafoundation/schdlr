@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { Panel, Field, LoadingBlock, ErrorBlock } from "../components/ui.jsx";
 import { fmtTime, toDateOnly, toDateInput, getSlotsForMember, buildAvailabilityIndex } from "../lib/scheduling.js";
@@ -6,7 +6,7 @@ import { fmtTime, toDateOnly, toDateInput, getSlotsForMember, buildAvailabilityI
 function fmtDateShort(d) { return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }); }
 
 export default function ManagePage() {
-  const [token, setToken] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get("token") || "");
+  const [email, setEmail] = useState("");
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [bookings, setBookings] = useState([]);
@@ -20,17 +20,20 @@ export default function ManagePage() {
 
   async function find() {
     setLoading(true); setError(""); setSearched(true);
-    const { data: rows, error: err } = await supabase.rpc("manage_public_booking", { p_token:token });
+    const [{ data: rows, error: err }, { data: mem }, { data: s }] = await Promise.all([
+      supabase.rpc("get_bookings_by_email", { p_email: email }),
+      supabase.from("team_members").select("*"),
+      supabase.from("org_settings").select("*").single(),
+    ]);
     if (err) setError(err.message);
     setBookings(rows || []);
-    setMembers((rows || []).map(b=>({id:b.member_id,name:b.host_name})));
+    setMembers(mem || []);
+    setSettings(s);
     setLoading(false);
   }
 
-  useEffect(() => { if (token) void find(); }, []);
-
   async function cancel(id) {
-    const { error } = await supabase.rpc("manage_public_booking", { p_token:token,p_action:"cancel",p_booking_id:id });
+    const { error } = await supabase.rpc("cancel_booking_by_email", { p_booking_id: id, p_email: email });
     if (error) { setError(error.message); return; }
     find();
   }
@@ -38,24 +41,24 @@ export default function ManagePage() {
   async function loadSlotsForReschedule(booking, dateStr) {
     if (!dateStr) { setNewSlots([]); return; }
     const orgId = booking.organization_id;
-    const [{data:availability,error:avError},{data:rules,error:rulesError}] = await Promise.all([
-      supabase.rpc("public_availability",{p_org_id:orgId}),
-      supabase.from("org_settings").select("*").eq("organization_id",orgId).single(),
+    const [bd, ro, va, pb] = await Promise.all([
+      supabase.from("blocked_dates").select("*").eq("organization_id", orgId),
+      supabase.from("recurring_days_off").select("*").eq("organization_id", orgId),
+      supabase.from("vacations").select("*").eq("organization_id", orgId),
+      supabase.from("partial_blocks").select("*").eq("organization_id", orgId),
     ]);
-    if (avError || rulesError) { setError("Could not load available times."); return; }
-    setSettings(rules);
-    const idx = buildAvailabilityIndex({ blockedDates:availability.blocked_dates,recurringOff:availability.recurring_days_off,vacations:availability.vacations,partialBlocks:availability.partial_blocks });
+    const idx = buildAvailabilityIndex({ blockedDates: bd.data || [], recurringOff: ro.data || [], vacations: va.data || [], partialBlocks: pb.data || [] });
     const from = dateStr, to = dateStr;
     const { data: busy } = await supabase.rpc("public_booking_slots", { p_org_id: orgId, p_from: from, p_to: to });
     const date = toDateOnly(dateStr);
-    const slots = getSlotsForMember(date, booking.duration_minutes, booking.member_id, rules, (busy || []).filter(b=>b.id!==booking.id), idx);
+    const slots = getSlotsForMember(date, booking.duration_minutes, booking.member_id, settings, busy || [], idx);
     setNewSlots(slots);
   }
 
   async function confirmReschedule(booking) {
     if (!newSlot) return;
-    const { data: ok, error } = await supabase.rpc("manage_public_booking", {
-      p_booking_id: booking.id, p_token:token,p_action:"reschedule",p_new_date:newDate,p_new_start:newSlot.minutes,
+    const { data: ok, error } = await supabase.rpc("reschedule_booking_by_email", {
+      p_booking_id: booking.id, p_email: email, p_new_date: newDate, p_new_start_minutes: newSlot.minutes,
     });
     if (error || !ok) { setError(error?.message || "Couldn't reschedule that booking."); return; }
     setReschedulingId(null); setNewDate(""); setNewSlots([]); setNewSlot(null);
@@ -66,9 +69,9 @@ export default function ManagePage() {
     <div className="max-w-xl">
       <Panel className="cv-card">
         <div className="cv-graphite font-mono text-[11px] tracking-widest mb-1 uppercase">🔗 Manage your booking</div>
-        <div className="cv-graphite text-sm mb-4">Use the private management link saved when booking. For an older booking, contact the team for help.</div>
+        <div className="cv-graphite text-sm mb-4">Enter the email you booked with to find and manage your meetings.</div>
         <div className="flex gap-2">
-          <input aria-label="Private management token" value={token} onChange={(e) => setToken((() => { try { return new URLSearchParams(new URL(e.target.value).hash.slice(1)).get("token") || e.target.value; } catch { return e.target.value; } })())} placeholder="Paste your private management token" className="cv-input flex-1 py-2" />
+          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" className="cv-input flex-1 py-2" />
           <button onClick={find} className="cv-btn-primary px-4 py-2 font-mono text-xs tracking-widest uppercase">Find</button>
         </div>
       </Panel>
@@ -79,7 +82,7 @@ export default function ManagePage() {
       {searched && !loading && (
         <div className="mt-6 space-y-2">
           {bookings.length === 0 ? (
-            <Panel className="cv-card text-center py-8"><div className="cv-faint italic text-sm">No upcoming meetings found for that private link.</div></Panel>
+            <Panel className="cv-card text-center py-8"><div className="cv-faint italic text-sm">No upcoming meetings found for that email.</div></Panel>
           ) : (
             bookings.map((b) => {
               const m = members.find((mm) => mm.id === b.member_id);
@@ -92,9 +95,9 @@ export default function ManagePage() {
                     <div className="flex-1 min-w-[140px]">
                       <div className="text-sm font-semibold">{b.duration_minutes} min with {m?.name || "your host"}</div>
                     </div>
-                    {!b.is_group && <button onClick={() => { setReschedulingId(isRescheduling ? null : b.id); setNewDate(""); setNewSlots([]); setNewSlot(null); }} className="cv-btn-outline px-3 py-1.5 font-mono text-[10px] tracking-widest uppercase">
+                    <button onClick={() => { setReschedulingId(isRescheduling ? null : b.id); setNewDate(""); setNewSlots([]); setNewSlot(null); }} className="cv-btn-outline px-3 py-1.5 font-mono text-[10px] tracking-widest uppercase">
                       {isRescheduling ? "Cancel edit" : "Reschedule"}
-                    </button>}
+                    </button>
                     <button onClick={() => cancel(b.id)} className="cv-x-btn font-mono text-[10px] tracking-widest uppercase">✕ Cancel</button>
                   </div>
                   {isRescheduling && (

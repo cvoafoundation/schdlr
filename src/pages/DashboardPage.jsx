@@ -11,7 +11,7 @@ function greeting() {
 }
 
 export default function DashboardPage() {
-  const { profile, orgId, organization } = useAuth();
+  const { profile, orgId } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [bookings, setBookings] = useState([]);
@@ -31,14 +31,14 @@ export default function DashboardPage() {
   async function load() {
     setLoading(true); setError("");
     const [b, ga, m, wl, bd, ro, va, pb] = await Promise.all([
-      supabase.from("bookings").select("*, event_types(is_group)").eq("organization_id", orgId).order("booking_date").order("start_minutes"),
-      supabase.from("group_attendees").select("*").eq("organization_id", orgId),
+      supabase.from("bookings").select("*, event_types(is_group)").order("booking_date").order("start_minutes"),
+      supabase.from("group_attendees").select("*"),
       supabase.from("organization_members").select("*").eq("organization_id", orgId).eq("status", "active").order("display_name"),
-      supabase.from("waitlist").select("*").eq("organization_id", orgId).order("created_at", { ascending: false }),
-      supabase.from("blocked_dates").select("*").eq("organization_id", orgId),
-      supabase.from("recurring_days_off").select("*").eq("organization_id", orgId),
-      supabase.from("vacations").select("*").eq("organization_id", orgId),
-      supabase.from("partial_blocks").select("*").eq("organization_id", orgId),
+      supabase.from("waitlist").select("*").order("created_at", { ascending: false }),
+      supabase.from("blocked_dates").select("*"),
+      supabase.from("recurring_days_off").select("*"),
+      supabase.from("vacations").select("*"),
+      supabase.from("partial_blocks").select("*"),
     ]);
     if (b.error) setError(b.error.message);
     setBookings(b.data || []);
@@ -56,7 +56,7 @@ export default function DashboardPage() {
   async function remove(id) { await supabase.from("bookings").delete().eq("id", id); load(); }
   function memberById(id) { return members.find((m) => m.id === id); }
   async function copyLink() {
-    const link = `${baseUrl}/book/${organization?.slug || "cvoa"}`;
+    const link = `${baseUrl}/`;
     const ok = await copyTextRobust(link);
     if (ok) { setCopied(true); setTimeout(() => setCopied(false), 1500); }
     else { setShowManualLink(true); }
@@ -100,7 +100,7 @@ export default function DashboardPage() {
         <div className="cv-note font-mono text-[11px] px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
           <span>Couldn't copy automatically (common inside embedded pages) — select the link below and copy it manually:</span>
           <input
-            readOnly value={`${baseUrl}/book/${organization?.slug || "cvoa"}`} onFocus={(e) => e.target.select()}
+            readOnly value={`${baseUrl}/`} onFocus={(e) => e.target.select()}
             className="cv-input py-1.5 px-2 flex-1 min-w-[220px]"
           />
         </div>

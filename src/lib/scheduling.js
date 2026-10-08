@@ -54,7 +54,14 @@ export function isMemberBlockedOnDate(memberId, date, index) {
 }
 
 function getMeetingBlocks(memberId, date, bookings) {
+  // A couple of deterministic "seed" busy blocks so a brand-new org still
+  // sees a realistic-looking calendar before real bookings pile up. Remove
+  // this once you have real usage, or leave it — it never blocks a whole day.
+  const hash1 = simpleHash(`${dateKey(date)}-${memberId}-a`);
+  const hash2 = simpleHash(`${dateKey(date)}-${memberId}-b`);
   const busy = [];
+  if (hash1 % 3 !== 0) busy.push({ start: 9 * 60 + (hash1 % 6) * 60, duration: 30 });
+  if (hash2 % 4 === 0) busy.push({ start: 10 * 60 + (hash2 % 5) * 60, duration: 60 });
   bookings
     .filter((b) => b.member_id === memberId && !b.is_group && isSameDay(toDateOnly(b.booking_date), date) && b.status !== "canceled")
     .forEach((b) => busy.push({ start: b.start_minutes, duration: b.duration_minutes }));
@@ -121,8 +128,8 @@ export function icsFileFor(booking, hostName) {
   const now = new Date();
   const stamp = icsDate(now, now.getHours() * 60 + now.getMinutes());
   return [
-    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Schedlr//Scheduling//EN", "BEGIN:VEVENT",
-    `UID:${booking.id}@schedlr.app`, `DTSTAMP:${stamp}`, `DTSTART:${start}`, `DTEND:${end}`,
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//CVOA Foundation//Scheduling//EN", "BEGIN:VEVENT",
+    `UID:${booking.id}@cvoa.org`, `DTSTAMP:${stamp}`, `DTSTART:${start}`, `DTEND:${end}`,
     `SUMMARY:${booking.duration} Minute Meeting with ${hostName}`,
     `DESCRIPTION:Guest: ${booking.guest_name || ""} (${booking.guest_email || ""})`,
     "END:VEVENT", "END:VCALENDAR",
