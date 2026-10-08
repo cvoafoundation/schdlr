@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { Panel, Field, Row, BackLink, StepRail, LoadingBlock, ErrorBlock, Avatar } from "../components/ui.jsx";
 import {
@@ -15,6 +16,9 @@ function daysInMonth(year, month) { return new Date(year, month + 1, 0).getDate(
 function fmtDateShort(d) { return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }); }
 
 export default function BookingPage() {
+  const { slug = "cvoa" } = useParams();
+  const [search] = useSearchParams();
+  const preferredMember = search.get("with");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [orgId, setOrgId] = useState(null);
@@ -42,10 +46,7 @@ export default function BookingPage() {
 
   async function loadStatic() {
     setLoading(true); setError("");
-    // Bridge until Stage 4 builds real /book/:slug URLs — every public page
-    // currently resolves to CVOA specifically. This is the one deliberate
-    // hardcode in the app; everything downstream of it is properly scoped.
-    const { data: resolvedOrgId, error: orgErr } = await supabase.rpc("get_org_id_by_slug", { p_slug: "cvoa" });
+    const { data: resolvedOrgId, error: orgErr } = await supabase.rpc("get_org_id_by_slug", { p_slug: slug });
     if (orgErr || !resolvedOrgId) { setError("Couldn't load this booking page."); setLoading(false); return; }
     setOrgId(resolvedOrgId);
 
@@ -55,25 +56,24 @@ export default function BookingPage() {
       supabase.from("org_settings").select("*").eq("organization_id", resolvedOrgId).single(),
     ]);
     if (m.error || et.error || s.error) setError((m.error || et.error || s.error).message);
-    setMembers((m.data || []).map((mm) => ({ id: mm.user_id, name: mm.display_name, role: mm.job_title || "Team member", initials: mm.initials, avatar_url: mm.avatar_url })));
+    setMembers((m.data || []).map((mm) => ({ id: mm.user_id, name: mm.display_name, role: mm.job_title || "Team member", booking_slug: mm.booking_slug, initials: mm.initials, avatar_url: mm.avatar_url })));
     setEventTypes(et.data || []);
     setSettings(s.data || { buffer_minutes: 15, notice_hours: 4, daily_cap: 6 });
     setLoading(false);
   }
-  useEffect(() => { loadStatic(); }, []);
+  useEffect(() => { loadStatic(); }, [slug]);
 
   async function loadAvailabilityAndBookings(currentOrgId) {
     if (!currentOrgId) return;
     const from = toDateInput(new Date());
     const to = toDateInput(addDays(new Date(), 60));
-    const [bd, ro, va, pb, slots] = await Promise.all([
-      supabase.from("blocked_dates").select("*").eq("organization_id", currentOrgId),
-      supabase.from("recurring_days_off").select("*").eq("organization_id", currentOrgId),
-      supabase.from("vacations").select("*").eq("organization_id", currentOrgId),
-      supabase.from("partial_blocks").select("*").eq("organization_id", currentOrgId),
+    const [availability, slots] = await Promise.all([
+      supabase.rpc("public_availability", { p_org_id: currentOrgId }),
       supabase.rpc("public_booking_slots", { p_org_id: currentOrgId, p_from: from, p_to: to }),
     ]);
-    setIndex(buildAvailabilityIndex({ blockedDates: bd.data || [], recurringOff: ro.data || [], vacations: va.data || [], partialBlocks: pb.data || [] }));
+    if (availability.error || slots.error) { setError("Could not load availability. Please reload this page."); return; }
+    const data = availability.data;
+    setIndex(buildAvailabilityIndex({ blockedDates: data.blocked_dates, recurringOff: data.recurring_days_off, vacations: data.vacations, partialBlocks: data.partial_blocks }));
     setBookingsRange((slots.data || []).map((b) => ({ ...b, member_id: b.member_id })));
   }
   useEffect(() => { if (orgId) loadAvailabilityAndBookings(orgId); }, [orgId]);
@@ -130,7 +130,7 @@ export default function BookingPage() {
     setEventType(evt); setSelectedDate(null); setSelectedSlot(null); setUrgent(false); setUrgentMsg("");
     setSeriesRepeat({ enabled: false, cadence: "biweekly", count: 3 });
     if (evt.is_group) { setMember(ANY); setStep("datetime"); }
-    else { setMember(ANY); setStep("team"); }
+    else { setMember(members.find(m => m.id === preferredMember) || ANY); setStep(preferredMember && members.some(m=>m.id===preferredMember) ? "datetime" : "team"); }
   }
   function continueFromTeam() {
     if (!urgent) { setStep("datetime"); return; }
@@ -172,55 +172,24 @@ export default function BookingPage() {
     }
     setSubmitting(true); setError("");
     try {
-      if (eventType.is_group) {
-        let bookingId = groupExisting?.id;
-        if (!bookingId) {
-          const { data, error } = await supabase.from("bookings").insert({
-            event_type_id: eventType.id, member_id: null, booking_date: toDateInput(selectedDate),
-            start_minutes: eventType.fixed_minutes, duration_minutes: eventType.duration_minutes,
-            guest_name: "Group session", guest_email: "group@cvoa.org", status: "upcoming", organization_id: orgId,
-          }).select().single();
-          if (error) throw error;
-          bookingId = data.id;
-        }
-        const { error: gaError } = await supabase.from("group_attendees").insert({ booking_id: bookingId, name: form.name, email: form.email, organization_id: orgId });
-        if (gaError) throw gaError;
-        setConfirmedBooking({ id: bookingId, date: selectedDate, minutes: eventType.fixed_minutes, duration: eventType.duration_minutes });
-        setStep("confirmed");
-        return;
+      const assignee = eventType.is_group ? null : resolveAssignee();
+      if (assignee) setMember(assignee);
+      const dates = [];
+      let d = selectedDate;
+      const total = seriesRepeat.enabled ? seriesRepeat.count : 1;
+      for (let i=0;i<total;i++) {
+        dates.push(toDateInput(d));
+        const cad = CADENCES.find(c=>c.id===seriesRepeat.cadence);
+        d = cad.id === "monthly" ? new Date(d.getFullYear(),d.getMonth()+1,d.getDate()) : addDays(d,cad.days);
       }
-
-      const assignee = resolveAssignee();
-      setMember(assignee);
-
-      if (seriesRepeat.enabled) {
-        const seriesId = crypto.randomUUID();
-        let d = selectedDate;
-        const rows = [];
-        for (let i = 0; i < seriesRepeat.count; i++) {
-          rows.push({
-            event_type_id: eventType.id, member_id: assignee.id, booking_date: toDateInput(d), start_minutes: selectedSlot.minutes,
-            duration_minutes: eventType.duration_minutes, guest_name: form.name, guest_email: form.email, guest_phone: form.phone,
-            notes: form.notes, status: "upcoming", urgent, series_id: seriesId, series_index: i + 1, series_total: seriesRepeat.count,
-            organization_id: orgId,
-          });
-          const cad = CADENCES.find((c) => c.id === seriesRepeat.cadence);
-          d = cad.id === "monthly" ? new Date(d.getFullYear(), d.getMonth() + 1, d.getDate()) : addDays(d, cad.days);
-        }
-        const { error } = await supabase.from("bookings").insert(rows);
-        if (error) throw error;
-        setConfirmedBooking({ id: seriesId, date: selectedDate, minutes: selectedSlot.minutes, duration: eventType.duration_minutes });
-        setStep("confirmed");
-        return;
-      }
-
-      const { data, error } = await supabase.from("bookings").insert({
-        event_type_id: eventType.id, member_id: assignee.id, booking_date: toDateInput(selectedDate), start_minutes: selectedSlot.minutes,
-        duration_minutes: eventType.duration_minutes, guest_name: form.name, guest_email: form.email, guest_phone: form.phone,
-        notes: form.notes, status: "upcoming", urgent, organization_id: orgId,
-      }).select().single();
-      if (error) throw error;
-      setConfirmedBooking({ id: data.id, date: selectedDate, minutes: selectedSlot.minutes, duration: eventType.duration_minutes });
+      const { data, error: failure } = await supabase.rpc("create_public_booking", {
+        p_org_id:orgId,p_event_id:eventType.id,p_member_id:assignee?.id === "any" ? null : assignee?.id || null,
+        p_dates:dates,p_start:eventType.is_group ? eventType.fixed_minutes : selectedSlot.minutes,
+        p_name:form.name,p_email:form.email,p_phone:form.phone,p_notes:form.notes,p_urgent:urgent,
+      });
+      if (failure) throw failure;
+      const booking = data.bookings[0];
+      setConfirmedBooking({ id:booking.id,date:selectedDate,minutes:booking.start_minutes,duration:booking.duration_minutes,managementToken:data.management_token });
       setStep("confirmed");
     } catch (e) {
       setError(e.message || "Something went wrong submitting your booking.");
@@ -236,7 +205,7 @@ export default function BookingPage() {
     loadAvailabilityAndBookings(orgId);
   }
 
-  if (error && !loading) return <div className="max-w-md mx-auto"><ErrorBlock message={error} /></div>;
+  if (error && !loading) return <div className="max-w-md mx-auto"><ErrorBlock message={error} /><button className="cv-btn-primary p-3 mt-3" onClick={() => { setError(""); if (orgId) { setStep("datetime"); void loadAvailabilityAndBookings(orgId); } else void loadStatic(); }}>Retry availability</button></div>;
   if (loading || !index) return <LoadingBlock label="Loading booking page…" />;
 
   const hostLabel = member.id === "any" ? "next available team member" : `${member.name} — ${member.role}`;
@@ -417,14 +386,14 @@ export default function BookingPage() {
               <div className="stamp text-sm font-extrabold">CONFIRMED</div>
             </div>
             <div className="mt-6 pt-5 space-y-3 font-mono text-sm" style={{ borderTop: "1px solid var(--line)" }}>
-              <Row label="With" value={eventType?.is_group ? "CVOA team" : `${member.name} — ${member.role}`} />
+              <Row label="With" value={eventType?.is_group ? "team" : `${member.name} — ${member.role}`} />
               <Row label="Date" value={selectedDate?.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })} />
               <Row label="Time" value={`${selectedSlot?.label} · ${eventType?.duration_minutes} min`} />
               {!eventType?.is_group && <Row label="Guest" value={`${form.name} <${form.email}>`} />}
               {seriesRepeat.enabled && !eventType?.is_group && <Row label="Series" value={`${seriesRepeat.count} sessions, ${CADENCES.find((c) => c.id === seriesRepeat.cadence).label.toLowerCase()}`} />}
             </div>
             <button
-              onClick={() => downloadIcs({ id: confirmedBooking.id, date: confirmedBooking.date, minutes: confirmedBooking.minutes, duration: confirmedBooking.duration, guest_name: form.name, guest_email: form.email }, eventType?.is_group ? "CVOA team" : member.name)}
+              onClick={() => downloadIcs({ id: confirmedBooking.id, date: confirmedBooking.date, minutes: confirmedBooking.minutes, duration: confirmedBooking.duration, guest_name: form.name, guest_email: form.email }, eventType?.is_group ? "team" : member.name)}
               className="cv-btn-outline mt-7 w-full px-5 py-3 font-mono text-xs tracking-widest uppercase"
             >
               ⬇ Add to calendar (.ics)

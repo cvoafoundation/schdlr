@@ -36,7 +36,7 @@ export default function AnalyticsPage() {
     async function load() {
       setLoading(true); setError("");
       const [b, m] = await Promise.all([
-        supabase.from("bookings").select("*, event_types(is_group)").order("booking_date"),
+        supabase.from("bookings").select("*, event_types(is_group)").eq("organization_id", orgId).order("booking_date"),
         supabase.from("organization_members").select("*").eq("organization_id", orgId).eq("status", "active").order("display_name"),
       ]);
       if (b.error) setError(b.error.message);

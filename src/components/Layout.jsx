@@ -1,22 +1,28 @@
 import { useEffect, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { supabase } from "../lib/supabaseClient";
 import { Avatar } from "./ui.jsx";
 
 export default function Layout({ children }) {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, orgId, organization, memberships, selectOrganization } = useAuth();
   const navigate = useNavigate();
+  const { slug } = useParams();
   const [org, setOrg] = useState({ org_name: "Schedlr", logo_url: null });
 
   useEffect(() => {
-    supabase.from("org_settings").select("org_name, logo_url").eq("id", 1).single().then(({ data }) => {
-      if (data) {
-        setOrg(data);
-        document.title = data.org_name || "Schedlr";
-      }
-    });
-  }, []);
+    let active = true;
+    setOrg({ org_name: organization?.name || "Schedlr", logo_url: null });
+    const load = async () => {
+      const resolved = slug ? (await supabase.rpc("get_org_id_by_slug", { p_slug: slug })).data : orgId;
+      if (!resolved) return;
+      const { data } = await supabase.from("org_settings").select("org_name,logo_url").eq("organization_id",resolved).maybeSingle();
+      if (active && data) setOrg(data);
+    };
+    void load();
+    return () => { active = false; };
+  }, [orgId, slug, organization?.name]);
+  const bookingUrl = `/book/${organization?.slug || slug || 'cvoa'}`;
 
   const tabClass = ({ isActive }) =>
     `cv-tab font-mono text-xs tracking-widest uppercase px-4 py-2 ${isActive ? "cv-tab-active" : ""}`;
@@ -36,7 +42,7 @@ export default function Layout({ children }) {
 
         <div className="flex items-center justify-between flex-wrap gap-3 mb-10">
           <div className="flex gap-2 flex-wrap">
-            <NavLink to="/" end className={tabClass}>Public booking page</NavLink>
+            <NavLink to={bookingUrl} end className={tabClass}>Public booking page</NavLink>
             <NavLink to="/manage" className={tabClass}>Manage booking</NavLink>
             {user && (
               <>
@@ -69,11 +75,16 @@ export default function Layout({ children }) {
           </div>
         </div>
 
+        {user && memberships.length > 1 && <label className="block text-sm mb-6">Scheduling workspace
+          <select aria-label="Scheduling workspace" className="cv-input block w-full mt-2 p-3" value={orgId || ''} onChange={e=>selectOrganization(e.target.value)}>
+            {memberships.map(m=><option key={m.organization_id} value={m.organization_id}>{m.organizations?.name || m.display_name}</option>)}
+          </select>
+        </label>}
         {children}
 
         <div className="mt-16 pt-5 cv-graphite font-mono text-[10px] tracking-widest flex items-center gap-2" style={{ borderTop: "1px solid var(--line)" }}>
           <img src="/schedlr-mark.png" alt="" className="w-4 h-4 object-contain" />
-          {(org.org_name || "SCHEDLR").toUpperCase()}
+          Powered by Schedlr
         </div>
       </div>
     </div>

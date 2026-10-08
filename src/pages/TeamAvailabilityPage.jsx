@@ -85,7 +85,7 @@ export default function TeamAvailabilityPage() {
     setUploadingPhoto(true); setPhotoError("");
     try {
       const ext = file.name.split(".").pop();
-      const path = `${profile.id}-${Date.now()}.${ext}`;
+      const path = `${profile.id}/${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, { cacheControl: "3600", upsert: false });
       if (upErr) throw upErr;
       const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
@@ -105,7 +105,7 @@ export default function TeamAvailabilityPage() {
     const existing = blockedDates.find((r) => r.member_id === viewingAs && r.blocked_date === dstr);
     if (existing) await supabase.from("blocked_dates").delete().eq("id", existing.id);
     else await supabase.from("blocked_dates").insert({ member_id: viewingAs, blocked_date: dstr, organization_id: orgId });
-    await supabase.from("audit_log").insert({ actor_id: viewingAs, action: `${existing ? "cleared" : "marked"} ${fmtDateShort(date)} ${existing ? "as available" : "unavailable"}`, organization_id: orgId });
+    await supabase.from("audit_log").insert({ actor_id: profile.id, action: `${existing ? "cleared" : "marked"} ${fmtDateShort(date)} ${existing ? "as available" : "unavailable"}`, organization_id: orgId });
     loadAll();
   }
   async function toggleRecurring(dow) {
@@ -113,20 +113,20 @@ export default function TeamAvailabilityPage() {
     const existing = recurringOff.find((r) => r.member_id === viewingAs && r.weekday === dow);
     if (existing) await supabase.from("recurring_days_off").delete().eq("id", existing.id);
     else await supabase.from("recurring_days_off").insert({ member_id: viewingAs, weekday: dow, organization_id: orgId });
-    await supabase.from("audit_log").insert({ actor_id: viewingAs, action: `${existing ? "removed" : "set"} recurring day off: ${WEEKDAY_LABELS[dow]}`, organization_id: orgId });
+    await supabase.from("audit_log").insert({ actor_id: profile.id, action: `${existing ? "removed" : "set"} recurring day off: ${WEEKDAY_LABELS[dow]}`, organization_id: orgId });
     loadAll();
   }
   async function submitVacation() {
     if (!isSelf || !vacStart) return;
     const start = vacStart, end = vacEnd || vacStart;
     await supabase.from("vacations").insert({ member_id: viewingAs, start_date: start, end_date: end, label: vacLabel || "Time off", organization_id: orgId });
-    await supabase.from("audit_log").insert({ actor_id: viewingAs, action: `added time off "${vacLabel || "Time off"}" (${start} – ${end})`, organization_id: orgId });
+    await supabase.from("audit_log").insert({ actor_id: profile.id, action: `added time off "${vacLabel || "Time off"}" (${start} – ${end})`, organization_id: orgId });
     setVacStart(""); setVacEnd(""); setVacLabel(""); loadAll();
   }
   async function removeVacation(id) {
     if (!isSelf) return;
     await supabase.from("vacations").delete().eq("id", id);
-    await supabase.from("audit_log").insert({ actor_id: viewingAs, action: "removed a time-off range", organization_id: orgId });
+    await supabase.from("audit_log").insert({ actor_id: profile.id, action: "removed a time-off range", organization_id: orgId });
     loadAll();
   }
   async function submitPartialBlock() {
@@ -140,13 +140,13 @@ export default function TeamAvailabilityPage() {
       member_id: viewingAs, recurring: partRecurring, block_date: partRecurring ? null : partDate,
       start_minutes: startMin, end_minutes: endMin, label: partLabel || "Time off", organization_id: orgId,
     });
-    await supabase.from("audit_log").insert({ actor_id: viewingAs, action: `added "${partLabel || "Time off"}" break`, organization_id: orgId });
+    await supabase.from("audit_log").insert({ actor_id: profile.id, action: `added "${partLabel || "Time off"}" break`, organization_id: orgId });
     setPartLabel("Lunch"); loadAll();
   }
   async function removePartialBlock(id) {
     if (!isSelf) return;
     await supabase.from("partial_blocks").delete().eq("id", id);
-    await supabase.from("audit_log").insert({ actor_id: viewingAs, action: "removed a daily break", organization_id: orgId });
+    await supabase.from("audit_log").insert({ actor_id: profile.id, action: "removed a daily break", organization_id: orgId });
     loadAll();
   }
 
