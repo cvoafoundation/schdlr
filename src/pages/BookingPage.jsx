@@ -175,13 +175,14 @@ export default function BookingPage() {
       if (eventType.is_group) {
         let bookingId = groupExisting?.id;
         if (!bookingId) {
-          const { data, error } = await supabase.from("bookings").insert({
+          bookingId = crypto.randomUUID();
+          const { error } = await supabase.from("bookings").insert({
+            id: bookingId,
             event_type_id: eventType.id, member_id: null, booking_date: toDateInput(selectedDate),
             start_minutes: eventType.fixed_minutes, duration_minutes: eventType.duration_minutes,
             guest_name: "Group session", guest_email: "group@cvoa.org", status: "upcoming", organization_id: orgId,
-          }).select().single();
+          });
           if (error) throw error;
-          bookingId = data.id;
         }
         const { error: gaError } = await supabase.from("group_attendees").insert({ booking_id: bookingId, name: form.name, email: form.email, organization_id: orgId });
         if (gaError) throw gaError;
@@ -214,13 +215,16 @@ export default function BookingPage() {
         return;
       }
 
-      const { data, error } = await supabase.from("bookings").insert({
+      // Public inserts must not request staff-only booking records back.
+      const bookingId = crypto.randomUUID();
+      const { error } = await supabase.from("bookings").insert({
+        id: bookingId,
         event_type_id: eventType.id, member_id: assignee.id, booking_date: toDateInput(selectedDate), start_minutes: selectedSlot.minutes,
         duration_minutes: eventType.duration_minutes, guest_name: form.name, guest_email: form.email, guest_phone: form.phone,
         notes: form.notes, status: "upcoming", urgent, organization_id: orgId,
-      }).select().single();
+      });
       if (error) throw error;
-      setConfirmedBooking({ id: data.id, date: selectedDate, minutes: selectedSlot.minutes, duration: eventType.duration_minutes });
+      setConfirmedBooking({ id: bookingId, date: selectedDate, minutes: selectedSlot.minutes, duration: eventType.duration_minutes });
       setStep("confirmed");
     } catch (e) {
       setError(e.message || "Something went wrong submitting your booking.");
