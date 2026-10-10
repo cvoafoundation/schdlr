@@ -14,6 +14,7 @@ import TeamAvailabilityPage from "./pages/TeamAvailabilityPage.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
 import AnalyticsPage from "./pages/AnalyticsPage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
+import CvoaMeetings from "./pages/CvoaMeetings.jsx";
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth();
@@ -31,6 +32,7 @@ function RequireAdmin({ children }) {
 }
 
 export default function App() {
+  if (new URLSearchParams(window.location.search).get('cvoa_workspace') === '1') return <CvoaMeetings />;
   if (publicBookingMode) return <Routes>
     <Route path="/" element={<Layout><BookingPage /></Layout>} />
     <Route path="*" element={<Navigate to="/" replace />} />

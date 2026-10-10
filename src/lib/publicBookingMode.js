@@ -2,7 +2,8 @@
 export function resolvePublicBookingMode(browser) {
   if (!browser) return false;
   const embedded = browser.parent !== browser;
-  const requested = new URLSearchParams(browser.location.search).get("cvoa_public") === "1";
+  const parameters = new URLSearchParams(browser.location.search);
+  const requested = parameters.get("cvoa_public") === "1" || parameters.get("cvoa_workspace") === "1";
   try {
     const active = embedded || requested || browser.sessionStorage.getItem("schedlr-public-booking") === "1";
     if (active) browser.sessionStorage.setItem("schedlr-public-booking", "1");
