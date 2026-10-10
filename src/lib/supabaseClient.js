@@ -1,3 +1,4 @@
+import { publicBookingMode, publicAuthOptions } from "./publicBookingMode.js";
 import { createClient } from "@supabase/supabase-js";
 
 const url = import.meta.env.VITE_SUPABASE_URL;
@@ -10,4 +11,4 @@ if (!url || !anonKey) {
   );
 }
 
-export const supabase = createClient(url, anonKey);
+export const supabase = createClient(url, anonKey, publicBookingMode ? { auth: publicAuthOptions } : undefined);

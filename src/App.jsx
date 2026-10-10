@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
+import { publicBookingMode } from "./lib/publicBookingMode.js";
 import Layout from "./components/Layout.jsx";
 import { useAuth } from "./hooks/useAuth";
 import { LoadingBlock } from "./components/ui.jsx";
@@ -30,6 +31,10 @@ function RequireAdmin({ children }) {
 }
 
 export default function App() {
+  if (publicBookingMode) return <Routes>
+    <Route path="/" element={<Layout><BookingPage /></Layout>} />
+    <Route path="*" element={<Navigate to="/" replace />} />
+  </Routes>;
   return (
     <Routes>
       <Route path="/" element={<Layout><BookingPage /></Layout>} />

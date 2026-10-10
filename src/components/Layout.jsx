@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { supabase } from "../lib/supabaseClient";
+import { publicBookingMode } from "../lib/publicBookingMode.js";
 import { Avatar } from "./ui.jsx";
 
 export default function Layout({ children }) {
@@ -37,8 +38,8 @@ export default function Layout({ children }) {
         <div className="flex items-center justify-between flex-wrap gap-3 mb-10">
           <div className="flex gap-2 flex-wrap">
             <NavLink to="/" end className={tabClass}>Public booking page</NavLink>
-            <NavLink to="/manage" className={tabClass}>Manage booking</NavLink>
-            {user && (
+            {!publicBookingMode && <NavLink to="/manage" className={tabClass}>Manage booking</NavLink>}
+            {!publicBookingMode && user && (
               <>
                 <span className="cv-divider w-px self-stretch mx-1" />
                 <NavLink to="/dashboard" className={tabClass}>Home</NavLink>
@@ -52,7 +53,7 @@ export default function Layout({ children }) {
               </>
             )}
           </div>
-          <div>
+          {!publicBookingMode && <div>
             {user ? (
               <button
                 onClick={async () => { await signOut(); navigate("/"); }}
@@ -66,7 +67,7 @@ export default function Layout({ children }) {
                 Staff sign in
               </NavLink>
             )}
-          </div>
+          </div>}
         </div>
 
         {children}
